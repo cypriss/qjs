@@ -16,26 +16,50 @@ import (
 //go:embed qjs.wasm
 var wasmBytes []byte
 
+// Global compilation state cached across runtimes. Protected by compilationMutex.
 var (
-	compiledQJSModule   wazero.CompiledModule
+	// compiledQJSModule is the cached compiled QuickJS module reused across instantiations.
+	compiledQJSModule wazero.CompiledModule
+
+	// cachedRuntimeConfig is the wazero RuntimeConfig associated with the cached module.
 	cachedRuntimeConfig wazero.RuntimeConfig
-	cachedBytesHash     uint64
-	compilationMutex    sync.Mutex
+
+	// cachedBytesHash is the hash of the wasm bytes last compiled, used to decide if recompilation
+	// is needed.
+	cachedBytesHash uint64
+
+	// compilationMutex serializes access to the global compilation cache and related state.
+	compilationMutex sync.Mutex
 )
 
 // Runtime wraps a QuickJS WebAssembly runtime with memory management.
 type Runtime struct {
-	wrt      wazero.Runtime
-	module   api.Module
-	malloc   api.Function
-	free     api.Function
-	mem      *Mem
-	option   *Option
-	handle   *Handle
-	context  *Context
+	// Host wazero runtime used to compile, instantiate, and run the QuickJS module.
+	wrt wazero.Runtime
+
+	module api.Module   // Instantiated QuickJS WebAssembly module.
+	malloc api.Function // Exported WASM function used to allocate linear memory.
+	free   api.Function // Exported WASM function used to free linear memory.
+
+	// Safe memory wrapper for reads and writes into the module's linear memory.
+	mem *Mem
+
+	// Configuration that controls runtime creation and behavior.
+	option *Option
+
+	// Opaque handle to the underlying QuickJS runtime (ex: JSRuntime) used for low-level calls.
+	handle *Handle
+
+	// Primary JavaScript execution context bound to this runtime.
+	context *Context
+
+	// Registry of Go proxies callable from JavaScript.
 	registry *ProxyRegistry
 }
 
+// createGlobalCompiledModule ensures the QuickJS WASM module is compiled and cached. If quickjsWasmBytes
+// is provided and differs from the cached bytes (by hash), or if DisableBuildCache is true,
+// the module is recompiled. The runtime configuration is cached and set to honor CloseOnContextDone.
 func createGlobalCompiledModule(
 	ctx context.Context,
 	closeOnContextDone bool,
@@ -297,6 +321,9 @@ func (r *Runtime) initializeRuntime() {
 	r.context.runtime = r
 }
 
+// call invokes the exported WASM function name with the provided arguments and returns the
+// first result. It panics if the function is not found or the invocation fails. If the function
+// produces no results, call returns 0.
 func (r *Runtime) call(name string, args ...uint64) uint64 {
 	fn := r.module.ExportedFunction(name)
 	if fn == nil {
@@ -318,11 +345,15 @@ func (r *Runtime) call(name string, args ...uint64) uint64 {
 
 // Pool manages a collection of reusable QuickJS runtimes.
 type Pool struct {
-	pools      chan *Runtime
-	size       int
-	option     *Option
+	pools  chan *Runtime // Idle runtimes available for reuse.
+	size   int           // Maximum number of runtimes cached in the pool.
+	option *Option       // Configuration used when creating new runtimes.
+
+	// Setup hooks applied to each newly created runtime.
 	setupFuncs []func(*Runtime) error
-	mu         sync.Mutex
+
+	// Guards creation when the pool is empty and avoids races.
+	mu sync.Mutex
 }
 
 // NewPool creates a new runtime pool with the specified size and configuration.

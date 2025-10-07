@@ -4,7 +4,7 @@ import "fmt"
 
 // Array provides a wrapper around JavaScript arrays with Go-like methods.
 type Array struct {
-	*Value
+	*Value // Underlying JS Array value. Follow normal Value ownership rules.
 }
 
 // NewArray wraps a JavaScript array value in a Go Array type.
@@ -16,6 +16,9 @@ func NewArray(value *Value) *Array {
 	return &Array{Value: value}
 }
 
+// ForEach calls forFn for each element in the array. key is the index as a JS value and value
+// is the element. If a, its underlying value, or forFn is nil, ForEach returns immediately.
+// Do not Free key, and only Free value if you cloned it to retain it.
 func (a *Array) ForEach(forFn func(key, value *Value)) {
 	if a == nil || a.Value == nil || forFn == nil {
 		return
@@ -83,7 +86,7 @@ func (a *Array) Delete(index int64) bool {
 
 // Map provides a wrapper around JavaScript Map objects with Go-like methods.
 type Map struct {
-	*Value
+	*Value // Embedded handle to the underlying JavaScript Map value.
 }
 
 // NewMap wraps a JavaScript Map value in a Go Map type.
@@ -216,7 +219,7 @@ func (m *Map) CreateObject() *Value {
 
 // Set provides a wrapper around JavaScript Set objects with Go-like methods.
 type Set struct {
-	*Value
+	*Value // Embedded handle to the underlying JavaScript Set value.
 }
 
 // NewSet wraps a JavaScript Set value in a Go Set type.

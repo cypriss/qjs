@@ -9,9 +9,14 @@ import (
 // Handle represents a reference to a QuickJS value. It manages raw pointer values from WebAssembly
 // memory and provides safe type conversion methods with proper resource management.
 type Handle struct {
-	raw     uint64
+	// Raw WebAssembly pointer or handle value. A value of 0 indicates a nil or invalid handle.
+	raw uint64
+
+	// Runtime that owns the memory and functions needed to operate on this handle.
 	runtime *Runtime
-	freed   int32 // atomic flag to prevent double-free
+
+	// atomic flag to prevent double-free
+	freed int32
 }
 
 // NewHandle creates a new Handle wrapping the given pointer value. The handle maintains a
@@ -69,14 +74,17 @@ type Signed interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64
 }
 
+// Unsigned is a type constraint matching all unsigned integer types, including uintptr.
 type Unsigned interface {
 	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr
 }
 
+// Integer is a type constraint matching all integer types (signed or unsigned).
 type Integer interface {
 	Signed | Unsigned
 }
 
+// Float is a type constraint matching the floating-point types.
 type Float interface {
 	~float32 | ~float64
 }
@@ -140,16 +148,40 @@ func ConvertToUnsigned[T Unsigned](h *Handle) T {
 	return result
 }
 
-func (h *Handle) Int() int         { return ConvertToSigned[int](h) }
-func (h *Handle) Int8() int8       { return ConvertToSigned[int8](h) }
-func (h *Handle) Int16() int16     { return ConvertToSigned[int16](h) }
-func (h *Handle) Int32() int32     { return ConvertToSigned[int32](h) }
-func (h *Handle) Int64() int64     { return ConvertToSigned[int64](h) }
-func (h *Handle) Uint() uint       { return ConvertToUnsigned[uint](h) }
-func (h *Handle) Uint8() uint8     { return ConvertToUnsigned[uint8](h) }
-func (h *Handle) Uint16() uint16   { return ConvertToUnsigned[uint16](h) }
-func (h *Handle) Uint32() uint32   { return ConvertToUnsigned[uint32](h) }
-func (h *Handle) Uint64() uint64   { return ConvertToUnsigned[uint64](h) }
+// Int returns the handle's value as an int using bounds-checked conversion.
+func (h *Handle) Int() int { return ConvertToSigned[int](h) }
+
+// Int8 returns the handle's value as an int8 using bounds-checked conversion.
+func (h *Handle) Int8() int8 { return ConvertToSigned[int8](h) }
+
+// Int16 returns the handle's value as an int16 using bounds-checked conversion.
+func (h *Handle) Int16() int16 { return ConvertToSigned[int16](h) }
+
+// Int32 returns the handle's numeric value as int32 with bounds checking. It panics if the
+// value cannot be represented as int32.
+func (h *Handle) Int32() int32 { return ConvertToSigned[int32](h) }
+
+// Int64 returns the handle's numeric value as int64 with bounds checking. It panics if the
+// value cannot be represented as int64.
+func (h *Handle) Int64() int64 { return ConvertToSigned[int64](h) }
+
+// Uint returns the handle's value as a uint using bounds-checked conversion.
+func (h *Handle) Uint() uint { return ConvertToUnsigned[uint](h) }
+
+// Uint8 returns the handle's value as a uint8 using bounds-checked conversion.
+func (h *Handle) Uint8() uint8 { return ConvertToUnsigned[uint8](h) }
+
+// Uint16 returns the handle's value as a uint16 using bounds-checked conversion.
+func (h *Handle) Uint16() uint16 { return ConvertToUnsigned[uint16](h) }
+
+// Uint32 returns the handle's numeric value as uint32 with bounds checking. It panics if the
+// value cannot be represented as uint32.
+func (h *Handle) Uint32() uint32 { return ConvertToUnsigned[uint32](h) }
+
+// Uint64 returns the handle's value as a uint64 using bounds-checked conversion.
+func (h *Handle) Uint64() uint64 { return ConvertToUnsigned[uint64](h) }
+
+// Uintptr returns the handle's value as a uintptr using bounds-checked conversion.
 func (h *Handle) Uintptr() uintptr { return ConvertToUnsigned[uintptr](h) }
 
 // Float32 converts the handle value to float32 by interpreting the lower 32 bits as IEEE 754

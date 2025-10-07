@@ -34,36 +34,67 @@ const (
 	JsEvalFlagAsync = (1 << 7)
 )
 
+// Option configures creation and instantiation of a QuickJS runtime and module.
 type Option struct {
-	CWD               string
+	// CWD is the host working directory mounted as "/" in the guest FS.
+	CWD string
+
+	// StartFunctionName names a WASM start function to invoke on instantiation (optional).
 	StartFunctionName string
-	Context           context.Context
+
+	// Context is the base context for runtime creation, execution, and cancellation.
+	Context context.Context
 
 	// Enabling this option significantly increases evaluation time because every operation must
 	// check the done context, which introduces additional overhead.
 	CloseOnContextDone bool
 
+	// DisableBuildCache disables reuse of compiled artifacts and forces recompilation.
 	DisableBuildCache bool
-	MemoryLimit       int
-	MaxStackSize      int
-	MaxExecutionTime  int
-	GCThreshold       int
-	QuickJSWasmBytes  []byte
-	ProxyFunction     any
-	Stdout            io.Writer
-	Stderr            io.Writer
+
+	// MemoryLimit sets the engine's memory limit. The unit and interpretation are engine-specific.
+	MemoryLimit int
+
+	// MaxStackSize sets the maximum stack size enforced by the engine.
+	MaxStackSize int
+
+	// MaxExecutionTime sets the maximum allowed execution time. Enforcement is engine-specific.
+	MaxExecutionTime int
+
+	// GCThreshold controls when the engine triggers garbage collection.
+	GCThreshold int
+
+	// QuickJSWasmBytes overrides the embedded qjs.wasm bytes used for compilation (optional).
+	QuickJSWasmBytes []byte
+
+	// ProxyFunction is exported to WASM as "jsFunctionProxy" and bridges JS calls into Go.
+	ProxyFunction any
+
+	// Stdout is the writer wired to the module's standard output.
+	Stdout io.Writer
+
+	// Stderr is the writer wired to the module's standard error.
+	Stderr io.Writer
 }
 
 // EvalOption configures JavaScript evaluation behavior in QuickJS context.
 type EvalOption struct {
-	c             *Context
-	file          string
-	code          string
-	bytecode      []byte
-	bytecodeLen   int
-	flags         uint64
-	fileValue     *Value // QuickJS value handles for memory management
-	codeValue     *Value
+	// Context used to allocate values and perform WASM calls. Must be non-nil.
+	c *Context
+
+	// Logical filename for the code (used in stack traces and module identity).
+	file string
+
+	code        string // JavaScript source to evaluate. Ignored if bytecode is provided.
+	bytecode    []byte // Precompiled QuickJS bytecode to execute.
+	bytecodeLen int    // Length of bytecode; should match len(bytecode).
+	flags       uint64 // Bitmask of JsEvalType*/JsEvalFlag* controlling evaluation mode.
+	fileValue   *Value // QuickJS value handles for memory management
+
+	// QuickJS value for code; created by Handle when code != "" and freed by Free.
+	codeValue *Value
+
+	// QuickJS value for bytecode buffer; created by Handle when set and freed by Free.
 	byteCodeValue *Value
 }
 
@@ -217,6 +248,9 @@ func (o *EvalOption) Free() {
 	}
 }
 
+// getRuntimeOption returns the first provided Option or a new one with sensible defaults.
+// It ensures CWD, Context, ProxyFunction, Stdout, and Stderr are set, returning an error if
+// the current working directory cannot be determined.
 func getRuntimeOption(registry *ProxyRegistry, options ...*Option) (option *Option, err error) {
 	if len(options) == 0 || options[0] == nil {
 		option = &Option{}

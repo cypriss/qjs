@@ -10,12 +10,25 @@ import (
 
 // Context represents a QuickJS execution context with associated runtime.
 type Context struct {
+	// Embedded base context used for cancellation, timeouts, and values passed into engine calls.
 	context.Context
-	handle  *Handle
+
+	// Underlying JSContext handle used for low-level calls. It is owned by the Runtime and becomes
+	// invalid after the Runtime is freed.
+	handle *Handle
+
+	// Owning QuickJS runtime that performs all WebAssembly calls and memory operations for this
+	// context.
 	runtime *Runtime
-	global  *Value
+
+	// Cached global object (ex: globalThis/window). It is initialized on the first Global call
+	// and reused thereafter.
+	global *Value
 }
 
+// Call invokes the exported QuickJS/WASM function name with the given raw arguments and returns
+// the result wrapped as a Value bound to c. It panics if the function cannot be found or the
+// invocation fails. The caller owns the returned Value and must call Free when finished.
 func (c *Context) Call(name string, args ...uint64) *Value {
 	return c.NewValue(c.runtime.Call(name, args...))
 }
