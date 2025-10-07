@@ -264,7 +264,7 @@ func (c *Context) NewArrayBuffer(binaryData []byte) *Value {
 	return c.Call("QJS_NewArrayBufferCopy", c.Raw(), ptr, uint64(len(binaryData)))
 }
 
-// NewError creates a new JavaScript Error object from Go error.
+// NewError creates a new JavaScript Error object from a Go error.
 func (c *Context) NewError(e error) *Value {
 	errString := c.NewString(e.Error())
 	errVal := c.Call("JS_NewError", c.Raw())
@@ -296,7 +296,7 @@ func (c *Context) ThrowError(err error) *Value {
 	return c.Throw(c.NewError(err))
 }
 
-// ThrowSyntaxError throws syntax error with given cause.
+// ThrowSyntaxError throws a syntax error with the given cause.
 func (c *Context) ThrowSyntaxError(format string, args ...any) *Value {
 	cause := fmt.Sprintf(format, args...)
 

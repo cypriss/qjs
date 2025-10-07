@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// StringifyErrorUnmarshaler implements json.Unmarshaler for testing JSONStringify errors
+// StringifyErrorUnmarshaler implements json.Unmarshaler for testing JSONStringify errors.
 type StringifyErrorUnmarshaler struct {
 	Value string
 }

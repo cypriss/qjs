@@ -62,7 +62,7 @@ type EvalOption struct {
 	bytecode      []byte
 	bytecodeLen   int
 	flags         uint64
-	fileValue     *Value // QuickJS value handles for memory management
+	fileValue     *Value // QuickJS value handles for memory management.
 	codeValue     *Value
 	byteCodeValue *Value
 }

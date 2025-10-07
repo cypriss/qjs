@@ -320,7 +320,7 @@ func (v *Value) DeleteProperty(name string) bool {
 	return v.Call("JS_DeleteProperty", v.Ctx(), v.Raw(), prop.Raw(), uint64(1)).Bool()
 }
 
-// Invoke call the object's method with the given name and arguments.
+// Invoke calls the object's method with the given name and arguments.
 func (v *Value) Invoke(fname string, args ...any) (_ *Value, err error) {
 	jsArgs := make([]*Value, len(args))
 	for i, arg := range args {
@@ -333,7 +333,7 @@ func (v *Value) Invoke(fname string, args ...any) (_ *Value, err error) {
 	return v.InvokeJS(fname, jsArgs...)
 }
 
-// InvokeJS call the object's method with the given name and JS arguments.
+// InvokeJS calls the object's method with the given name and JS arguments.
 func (v *Value) InvokeJS(fname string, args ...*Value) (*Value, error) {
 	if !v.IsObject() {
 		return v.NewUndefined(), ErrCallFuncOnNonObject
@@ -547,7 +547,7 @@ func (v *Value) IsGlobalInstanceOf(name string) bool {
 	return instanceOf.handle.Bool()
 }
 
-// IsByteArray return true if the value is array buffer.
+// IsByteArray returns true if the value is an array buffer.
 func (v *Value) IsByteArray() bool {
 	return v.IsObject() && v.IsGlobalInstanceOf("ArrayBuffer") ||
 		v.String() == "[object ArrayBuffer]"
@@ -647,8 +647,8 @@ func (v *Value) Bool() bool {
 	return v.Call("JS_ToBool", v.Ctx(), v.Raw()).handle.Bool()
 }
 
-// Int32 returns the int32 value of the value. in c int is 32 bit, but in go it is depends
-// on the architecture.
+// Int32 returns the int32 value of the value. In C, int is 32-bit, but in Go it depends on
+// the architecture.
 func (v *Value) Int32() int32 {
 	return v.Call("QJS_ToInt32", v.Ctx(), v.Raw()).handle.Int32()
 }

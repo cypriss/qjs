@@ -11,7 +11,7 @@ import (
 type Handle struct {
 	raw     uint64
 	runtime *Runtime
-	freed   int32 // atomic flag to prevent double-free
+	freed   int32 // Atomic flag to prevent double-free.
 }
 
 // NewHandle creates a new Handle wrapping the given pointer value. The handle maintains a
@@ -28,8 +28,8 @@ func NewHandle(runtime *Runtime, ptr uint64) *Handle {
 	}
 }
 
-// Free releases the memory associated with this handle. Only used with C values such as: QJS_ToCString,
-// QJS_JSONStringify. Do not use this method for JsValue.
+// Free releases the memory associated with this handle. Use only with C values such as QJS_ToCString
+// and QJS_JSONStringify. Do not use this method for JsValue.
 func (h *Handle) Free() {
 	if h == nil || h.runtime == nil {
 		return

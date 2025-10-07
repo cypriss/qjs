@@ -82,7 +82,7 @@ var (
 	}
 )
 
-// ObjectOrMap interface for unified object/map handling.
+// ObjectOrMap is an interface for unified object/map handling.
 type ObjectOrMap interface {
 	IsObject() bool
 	IsMap() bool
@@ -100,8 +100,8 @@ type FieldMapper struct {
 
 // FieldPath stores the path to a field through embedded structs.
 type FieldPath struct {
-	indices []int               // Path to the field through embedded structs
-	field   reflect.StructField // Field info
+	indices []int               // Path to the field through embedded structs.
+	field   reflect.StructField // Field info.
 }
 
 // NewFieldMapper creates a new field mapper with initialized cache.
@@ -263,7 +263,7 @@ func (ct *CircularTracker[T]) trackPtr(ctx *Tracker[T], ptr T) error {
 	return nil
 }
 
-// // trackValue sets up circular reference tracking for a JS value.
+// trackValue sets up circular reference tracking for a JS value.
 func (ct *CircularTracker[T]) trackValue(ctx *Tracker[T], value *Value) error {
 	var ptr any = value.Raw()
 
@@ -876,7 +876,7 @@ func ParseTimezone(tz string) *time.Location {
 	return time.UTC
 }
 
-// Is32BitPlatform check if the platform is 32-bit by comparing the size of uintptr.
+// Is32BitPlatform checks if the platform is 32-bit by comparing the size of uintptr.
 func Is32BitPlatform() bool {
 	return strconv.IntSize == 32
 }

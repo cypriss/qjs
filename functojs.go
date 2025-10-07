@@ -192,7 +192,7 @@ func JsArgToGo(jsArg *Value, argType reflect.Type) (reflect.Value, error) {
 	return reflect.ValueOf(goVal), nil
 }
 
-// CreateVariadicSlice creates a reflect.Value slice for variadic arguments. Converts remaining
+// CreateVariadicSlice creates a reflect.Value slice for variadic arguments. It converts remaining
 // JS arguments to the slice element type and returns as a slice value.
 func CreateVariadicSlice(jsArgs []*Value, sliceType reflect.Type, fixedArgsCount int) (reflect.Value, error) {
 	varArgType := sliceType.Elem()

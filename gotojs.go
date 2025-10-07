@@ -336,7 +336,7 @@ func withJSObject(c *Context, fn func(*Value) error) (*Value, error) {
 	return obj, nil
 }
 
-// addStructFieldsToObject converts struct fields to JS object properties. Processes embedded
+// addStructFieldsToObject converts struct fields to JS object properties. It processes embedded
 // fields first, then regular fields to allow overriding.
 func (tracker *Tracker[T]) addStructFieldsToObject(
 	c *Context,

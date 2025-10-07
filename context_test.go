@@ -334,7 +334,7 @@ func TestContextFunctionBinding(t *testing.T) {
 	})
 }
 
-// Helper structure for function test cases
+// Helper structure for function test cases.
 type functionTestCase struct {
 	name              string
 	fn                qjs.Function
@@ -345,7 +345,7 @@ type functionTestCase struct {
 	expectValue       func(*testing.T, *qjs.Value)
 }
 
-// Synchronous Functions Tests
+// Synchronous Functions Tests.
 func testSynchronousFunctions(t *testing.T) {
 	t.Run("basic_function_registration", func(t *testing.T) {
 		_, ctx := setupRuntime(t)
@@ -383,7 +383,7 @@ func testSynchronousFunctions(t *testing.T) {
 	})
 }
 
-// Asynchronous Functions Tests
+// Asynchronous Functions Tests.
 func testAsynchronousFunctions(t *testing.T) {
 	t.Run("basic_async_function", func(t *testing.T) {
 		_, ctx := setupRuntime(t)
@@ -639,7 +639,7 @@ func createAsyncArgumentHandlingTests() []functionTestCase {
 	}
 }
 
-// runFunctionTests executes a set of function test cases
+// runFunctionTests executes a set of function test cases.
 func runFunctionTests(t *testing.T, tests []functionTestCase, isAsync bool) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
