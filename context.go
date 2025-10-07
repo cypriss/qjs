@@ -12,9 +12,12 @@ import (
 type Context struct {
 	context.Context
 
-	handle  *Handle
+	// handle is the QuickJS JSContext pointer handle.
+	handle *Handle
+	// runtime is the owning QuickJS runtime instance.
 	runtime *Runtime
-	global  *Value
+	// global caches the global object for repeated access.
+	global *Value
 }
 
 func (c *Context) Call(name string, args ...uint64) *Value {

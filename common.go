@@ -88,14 +88,18 @@ type ObjectOrMap interface {
 
 // FieldMapper handles struct field mapping with caching for performance.
 type FieldMapper struct {
-	mu    sync.RWMutex
+	// mu guards access to cache for concurrent GetFieldMap calls.
+	mu sync.RWMutex
+	// cache maps struct types to their JSON field name -> FieldPath metadata.
 	cache map[reflect.Type]map[string]FieldPath
 }
 
 // FieldPath stores the path to a field through embedded structs.
 type FieldPath struct {
-	indices []int               // Path to the field through embedded structs
-	field   reflect.StructField // Field info
+	// indices is the path of field indexes through embedded structs.
+	indices []int
+	// field is the reflected StructField metadata of the terminal field.
+	field reflect.StructField
 }
 
 // NewFieldMapper creates a new field mapper with initialized cache.
@@ -210,6 +214,7 @@ func getFieldMap(structType reflect.Type) map[string]FieldPath {
 
 // Tracker tracks objects during Go-JS conversion to detect circular references.
 type Tracker[T uintptr | uint64] struct {
+	// processing tracks pointers currently being converted to detect cycles.
 	processing map[T]bool
 }
 
@@ -239,8 +244,11 @@ func (tracker *Tracker[T]) UnTrack(ptr T) {
 
 // CircularTracker manages the lifecycle of circular reference tracking for a single object.
 type CircularTracker[T uintptr | uint64] struct {
-	ctx             *Tracker[T]
-	ptr             T
+	// ctx is the tracker instance used for cycle detection.
+	ctx *Tracker[T]
+	// ptr is the identifier of the tracked value.
+	ptr T
+	// needsUnregister indicates whether cleanup should untrack the value.
 	needsUnregister bool
 }
 
@@ -282,8 +290,10 @@ func (ct *CircularTracker[T]) cleanup() {
 
 // JsNumericToGoConverter handles conversion from float64 to various numeric types.
 type JsNumericToGoConverter struct {
+	// targetType is the destination numeric type (elem if pointer).
 	targetType reflect.Type
-	isPointer  bool
+	// isPointer indicates if the original target type was a pointer.
+	isPointer bool
 }
 
 func NewJsNumericToGoConverter(targetType reflect.Type) *JsNumericToGoConverter {
@@ -320,10 +330,14 @@ func (nc *JsNumericToGoConverter) Convert(floatVal float64) (any, error) {
 
 // JsArrayToGoConverter handles array conversions with better error handling and performance.
 type JsArrayToGoConverter[T any] struct {
-	tracker    *Tracker[uint64]
-	input      *Value
+	// tracker detects circular references during conversion.
+	tracker *Tracker[uint64]
+	// input is the JS value expected to be an Array or array-like.
+	input *Value
+	// targetType is the concrete target type of T when provided.
 	targetType reflect.Type
-	sample     T
+	// sample holds an optional sample value to guide conversion.
+	sample T
 }
 
 func NewJsArrayToGoConverter[T any](input *Value, samples ...T) *JsArrayToGoConverter[T] {

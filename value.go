@@ -15,22 +15,30 @@ type (
 )
 
 type Value struct {
-	handle  *Handle
+	// handle is the underlying QuickJS JSValue handle.
+	handle *Handle
+	// context is the owning execution context used for calls and memory management.
 	context *Context
 }
 
 type This struct {
 	*Value
 
+	// context is the owning execution context used during a function callback.
 	context *Context
-	args    []*Value
+	// args are the arguments passed from JavaScript to the Go function.
+	args []*Value
+	// promise is the Promise.withResolvers-like pair passed for async Go bindings.
 	promise *Value
+	// isAsync indicates whether the function proxy was created with async semantics.
 	isAsync bool
 }
 
 type JSPropertyEnum struct {
+	// isEnumerable indicates if the property is enumerable.
 	isEnumerable bool
-	atom         JSAtom
+	// atom is the property key atom.
+	atom JSAtom
 }
 
 const jsPropertyEnumSize = uint32(unsafe.Sizeof(JSPropertyEnum{}))
@@ -40,12 +48,15 @@ const jsPropertyEnumSize = uint32(unsafe.Sizeof(JSPropertyEnum{}))
 type Atom struct {
 	*Value
 
+	// context is the owning execution context for atom operations.
 	context *Context
 }
 
 type OwnProperty struct {
+	// isEnumerable indicates if the property is enumerable on the object.
 	isEnumerable bool
-	atom         Atom
+	// atom is the property key represented as an atom.
+	atom Atom
 }
 
 func (p OwnProperty) String() string {

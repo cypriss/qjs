@@ -31,35 +31,79 @@ const (
 )
 
 type Option struct {
-	CWD               string
+	// CWD is the host working directory mounted into the WASI FS root ("/").
+	// It affects module resolution and file access inside the QuickJS runtime.
+	CWD string
+
+	// StartFunctionName is an optional name of a start function to run when
+	// instantiating the WASM module. Leave empty for default behavior.
 	StartFunctionName string
-	Context           context.Context
-	// Enabling this option significantly increases evaluation time
-	// because every operation must check the done context, which introduces additional overhead.
+
+	// Context controls lifecycle and cancellation for the runtime and WASM calls.
+	// If nil, context.Background() is used.
+	Context context.Context
+
+	// CloseOnContextDone closes the underlying wazero Runtime when the Context is done.
+	// Enabling this option significantly increases evaluation time because every operation
+	// must check the done context, which introduces additional overhead.
 	CloseOnContextDone bool
-	DisableBuildCache  bool
-	MemoryLimit        int
-	MaxStackSize       int
-	MaxExecutionTime   int
-	GCThreshold        int
-	QuickJSWasmBytes   []byte
-	ProxyFunction      any
-	Stdout             io.Writer
-	Stderr             io.Writer
+
+	// DisableBuildCache forces recompilation of the embedded/module bytes instead of using
+	// a cached compiled module in-process.
+	DisableBuildCache bool
+
+	// MemoryLimit caps the QuickJS memory (in bytes) managed by its GC.
+	MemoryLimit int
+
+	// MaxStackSize caps the QuickJS stack size (in bytes).
+	MaxStackSize int
+
+	// MaxExecutionTime sets a soft execution time limit (milliseconds) enforced by QuickJS.
+	MaxExecutionTime int
+
+	// GCThreshold sets the QuickJS GC threshold (in bytes) before automatic collection.
+	GCThreshold int
+
+	// QuickJSWasmBytes overrides the embedded `qjs.wasm` bytes used to instantiate the runtime.
+	QuickJSWasmBytes []byte
+
+	// ProxyFunction is the host function exported to WASM as env.jsFunctionProxy.
+	// It bridges JS function calls back into Go.
+	ProxyFunction any
+
+	// Stdout is wired to the WASM module's stdout.
+	Stdout io.Writer
+
+	// Stderr is wired to the WASM module's stderr.
+	Stderr io.Writer
 }
 
 // EvalOption configures JavaScript evaluation behavior in QuickJS context.
 type EvalOption struct {
-	c           *Context
-	file        string
-	code        string
-	bytecode    []byte
+	// c is the execution context used to allocate strings/values and make calls.
+	c *Context
+
+	// file is the logical filename used by QuickJS for stack traces and module resolution.
+	file string
+
+	// code holds the JavaScript source to evaluate. Mutually exclusive with bytecode.
+	code string
+
+	// bytecode holds precompiled bytecode to execute. Mutually exclusive with code.
+	bytecode []byte
+
+	// bytecodeLen caches len(bytecode) for efficient WASM interop.
 	bytecodeLen int
-	flags       uint64
+
+	// flags is a bitmask of JsEvalType* and JsEvalFlag* values.
+	flags uint64
 
 	// QuickJS value handles for memory management
-	fileValue     *Value
-	codeValue     *Value
+	// fileValue is a handle to the file name string.
+	fileValue *Value
+	// codeValue is a handle to the source code string.
+	codeValue *Value
+	// byteCodeValue is a handle to the bytecode buffer.
 	byteCodeValue *Value
 }
 
