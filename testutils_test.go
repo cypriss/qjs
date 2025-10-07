@@ -14,11 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestContext(_ *testing.T) (*qjs.Runtime, *qjs.Context) {
-	runtime := must(qjs.New())
-	ctx := runtime.Context()
-	// t.Cleanup(runtime.Close)
-	return runtime, ctx
+type EmbeddedStruct struct {
+	Name string
+	Age  int
 }
 
 type CustomUnmarshaler struct {
@@ -41,11 +39,6 @@ func (c *CustomUnmarshaler) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type EmbeddedStruct struct {
-	Name string
-	Age  int
-}
-
 type unExportedFieldStruct struct {
 	Anything string
 }
@@ -54,6 +47,18 @@ type NestedEmbeddedStruct struct {
 	EmbeddedStruct
 	unExportedFieldStruct
 	Label string
+}
+
+type modeGlobalTest struct {
+	file      string
+	wantError bool
+	expect    func(val *qjs.Value, err error)
+}
+
+type modeModuleTest struct {
+	moduleDir string
+	wantError bool
+	expect    func(val *qjs.Value, err error)
 }
 
 func must[T any](val T, err error) T {
@@ -92,16 +97,11 @@ func glob(path string, exts ...string) ([]string, error) {
 	return files, nil
 }
 
-type modeGlobalTest struct {
-	file      string
-	wantError bool
-	expect    func(val *qjs.Value, err error)
-}
-
-type modeModuleTest struct {
-	moduleDir string
-	wantError bool
-	expect    func(val *qjs.Value, err error)
+func setupTestContext(_ *testing.T) (*qjs.Runtime, *qjs.Context) {
+	runtime := must(qjs.New())
+	ctx := runtime.Context()
+	// t.Cleanup(runtime.Close)
+	return runtime, ctx
 }
 
 func genModeGlobalTests(t *testing.T) []modeGlobalTest {

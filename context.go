@@ -16,59 +16,6 @@ type Context struct {
 	global  *Value
 }
 
-func (c *Context) Call(name string, args ...uint64) *Value {
-	return c.NewValue(c.runtime.Call(name, args...))
-}
-
-// CallUnPack delegates function calls and unpacks the result.
-func (c *Context) CallUnPack(name string, args ...uint64) (uint32, uint32) {
-	return c.runtime.CallUnPack(name, args...)
-}
-
-// FreeHandle releases memory associated with the given handle pointer.
-func (c *Context) FreeHandle(ptr uint64) {
-	c.runtime.FreeHandle(ptr)
-}
-
-// FreeJsValue releases memory associated with the JavaScript value.
-func (c *Context) FreeJsValue(val uint64) {
-	c.runtime.FreeJsValue(val)
-}
-
-// Malloc allocates memory in the WASM runtime.
-func (c *Context) Malloc(size uint64) uint64 {
-	return c.runtime.Malloc(size)
-}
-
-// MemRead reads bytes from WASM memory at the given address.
-func (c *Context) MemRead(addr uint32, size uint64) []byte {
-	return c.runtime.mem.MustRead(addr, size)
-}
-
-// MemWrite writes bytes to WASM memory at the given address.
-func (c *Context) MemWrite(addr uint32, b []byte) {
-	c.runtime.mem.MustWrite(addr, b)
-}
-
-// NewProxyValue creates a new Value that represents a proxy to a Go value.
-func (c *Context) NewProxyValue(v any) *Value {
-	proxyID := c.runtime.registry.Register(v)
-
-	return c.Call("QJS_NewProxyValue", c.Raw(), proxyID)
-}
-
-// NewStringHandle creates a Value from a string using runtime handle.
-func (c *Context) NewStringHandle(v string) *Value {
-	handle := c.runtime.NewStringHandle(v)
-
-	return c.NewValue(handle)
-}
-
-// NewBytes creates a Value from a byte slice.
-func (c *Context) NewBytes(v []byte) *Value {
-	return c.NewValue(c.runtime.NewBytesHandle(v))
-}
-
 // String returns the string representation of the Context.
 func (c *Context) String() string {
 	return fmt.Sprintf("Context(%p)", c.handle)
@@ -79,14 +26,14 @@ func (c *Context) Raw() uint64 {
 	return c.handle.raw
 }
 
-// Load loads a JavaScript module without evaluating it.
-func (c *Context) Load(file string, flags ...EvalOptionFunc) (*Value, error) {
-	return load(c, file, flags...)
-}
-
 // Eval evaluates a script within the current context.
 func (c *Context) Eval(file string, flags ...EvalOptionFunc) (*Value, error) {
 	return eval(c, file, flags...)
+}
+
+// Load loads a JavaScript module without evaluating it.
+func (c *Context) Load(file string, flags ...EvalOptionFunc) (*Value, error) {
+	return load(c, file, flags...)
 }
 
 // Compile compiles a script into bytecode.
@@ -121,27 +68,59 @@ func (c *Context) SetAsyncFunc(name string, fn AsyncFunction) {
 	global.SetPropertyStr(name, jsFn)
 }
 
-// ParseJSON parses given JSON string and returns an object value.
-func (c *Context) ParseJSON(v string) *Value {
-	cStr := c.NewStringHandle(v)
-	defer cStr.Free()
+// Function creates a JavaScript function that wraps the given Go function.
+func (c *Context) Function(fn Function, isAsyncs ...bool) *Value {
+	isAsync := uint64(0)
+	if len(isAsyncs) > 0 && isAsyncs[0] {
+		isAsync = 1
+	}
 
-	return c.Call("QJS_ParseJSON", c.Raw(), cStr.Raw())
+	fnID := c.runtime.registry.Register(fn)
+	ctxID := c.runtime.registry.Register(c)
+	proxyFuncVal := c.Call("QJS_CreateFunctionProxy", c.Raw(), fnID, ctxID, isAsync)
+
+	// Registry: Store IDs for cleanup and callback identification
+	proxyFuncVal.SetPropertyStr("__fnID", c.NewInt64(int64(fnID)))
+	proxyFuncVal.SetPropertyStr("__ctxID", c.NewInt64(int64(ctxID)))
+
+	return proxyFuncVal
 }
 
-// NewValue creates a new Value wrapper around the given handle.
-func (c *Context) NewValue(handle *Handle) *Value {
-	return &Value{context: c, handle: handle}
+// Invoke invokes a function with given this value and arguments.
+func (c *Context) Invoke(fn *Value, this *Value, args ...*Value) (*Value, error) {
+	argc, argvPtr := createJsCallArgs(c, args...)
+	defer c.FreeHandle(argvPtr)
+
+	jsCallArgs := []uint64{
+		c.Raw(),
+		fn.Raw(),
+		this.Raw(),
+		argc,
+		argvPtr,
+	}
+	result := c.Call("QJS_Call", jsCallArgs...)
+
+	return normalizeJsValue(c, result)
 }
 
-// NewUninitialized creates a new uninitialized JavaScript value.
-func (c *Context) NewUninitialized() *Value {
-	return c.Call("JS_NewUninitialized")
-}
+// createJsCallArgs marshals Go Value arguments to WASM memory for JavaScript calls.
+func createJsCallArgs(c *Context, args ...*Value) (uint64, uint64) {
+	var argvPtr uint64
 
-// NewNull creates a new null JavaScript value.
-func (c *Context) NewNull() *Value {
-	return c.Call("JS_NewNull")
+	argc := uint64(len(args))
+	if argc > 0 {
+		argvBytes := make([]byte, Uint64ByteSize*argc)
+		for i, v := range args {
+			// WASM: Pack 64-bit JSValue handles in little-endian format
+			binary.LittleEndian.PutUint64(argvBytes[i*Uint64ByteSize:], v.Raw())
+		}
+
+		// WASM: Allocate and write argument array to memory
+		argvPtr = c.Malloc(uint64(len(argvBytes)))
+		c.MemWrite(uint32(argvPtr), argvBytes)
+	}
+
+	return argc, argvPtr
 }
 
 // NewUndefined creates a new undefined JavaScript value.
@@ -149,11 +128,14 @@ func (c *Context) NewUndefined() *Value {
 	return c.Call("JS_NewUndefined")
 }
 
-// NewDate creates a new JavaScript Date object from the given time.
-func (c *Context) NewDate(t *time.Time) *Value {
-	epochMs := float64(t.UnixNano()) / NanosToMillis // Nanoseconds to milliseconds
+// NewNull creates a new null JavaScript value.
+func (c *Context) NewNull() *Value {
+	return c.Call("JS_NewNull")
+}
 
-	return c.Call("JS_NewDate", c.Raw(), math.Float64bits(epochMs))
+// NewUninitialized creates a new uninitialized JavaScript value.
+func (c *Context) NewUninitialized() *Value {
+	return c.Call("JS_NewUninitialized")
 }
 
 // NewBool creates a new JavaScript boolean value.
@@ -166,14 +148,14 @@ func (c *Context) NewBool(b bool) *Value {
 	return c.Call("QJS_NewBool", c.Raw(), boolVal)
 }
 
-// NewUint32 creates a new JavaScript number from uint32.
-func (c *Context) NewUint32(v uint32) *Value {
-	return c.Call("QJS_NewUint32", c.Raw(), uint64(v))
-}
-
 // NewInt32 creates a new JavaScript number from int32.
 func (c *Context) NewInt32(v int32) *Value {
 	return c.Call("QJS_NewInt32", c.Raw(), uint64(v))
+}
+
+// NewUint32 creates a new JavaScript number from uint32.
+func (c *Context) NewUint32(v uint32) *Value {
+	return c.Call("QJS_NewUint32", c.Raw(), uint64(v))
 }
 
 // NewInt64 creates a new JavaScript number from int64.
@@ -201,6 +183,18 @@ func (c *Context) NewString(v string) *Value {
 	str := c.NewStringHandle(v)
 
 	return c.Call("QJS_NewString", c.Raw(), str.Raw())
+}
+
+// NewStringHandle creates a Value from a string using runtime handle.
+func (c *Context) NewStringHandle(v string) *Value {
+	handle := c.runtime.NewStringHandle(v)
+
+	return c.NewValue(handle)
+}
+
+// NewBytes creates a Value from a byte slice.
+func (c *Context) NewBytes(v []byte) *Value {
+	return c.NewValue(c.runtime.NewBytesHandle(v))
 }
 
 // NewObject creates a new empty JavaScript object.
@@ -235,6 +229,31 @@ func (c *Context) NewSet() *Set {
 	return NewSet(val)
 }
 
+// NewArrayBuffer creates a new JavaScript ArrayBuffer with the given binary data.
+func (c *Context) NewArrayBuffer(binaryData []byte) *Value {
+	ptr := c.Malloc(uint64(len(binaryData)))
+	defer c.FreeHandle(ptr)
+
+	c.MemWrite(uint32(ptr), binaryData)
+
+	return c.Call("QJS_NewArrayBufferCopy", c.Raw(), ptr, uint64(len(binaryData)))
+}
+
+// NewDate creates a new JavaScript Date object from the given time.
+func (c *Context) NewDate(t *time.Time) *Value {
+	epochMs := float64(t.UnixNano()) / NanosToMillis // Nanoseconds to milliseconds
+
+	return c.Call("JS_NewDate", c.Raw(), math.Float64bits(epochMs))
+}
+
+// ParseJSON parses given JSON string and returns an object value.
+func (c *Context) ParseJSON(v string) *Value {
+	cStr := c.NewStringHandle(v)
+	defer cStr.Free()
+
+	return c.Call("QJS_ParseJSON", c.Raw(), cStr.Raw())
+}
+
 // NewAtom creates a new Atom from the given string.
 func (c *Context) NewAtom(v string) Atom {
 	cstr := c.NewStringHandle(v)
@@ -254,23 +273,11 @@ func (c *Context) NewAtomIndex(index int64) Atom {
 	}
 }
 
-// NewArrayBuffer creates a new JavaScript ArrayBuffer with the given binary data.
-func (c *Context) NewArrayBuffer(binaryData []byte) *Value {
-	ptr := c.Malloc(uint64(len(binaryData)))
-	defer c.FreeHandle(ptr)
+// NewProxyValue creates a new Value that represents a proxy to a Go value.
+func (c *Context) NewProxyValue(v any) *Value {
+	proxyID := c.runtime.registry.Register(v)
 
-	c.MemWrite(uint32(ptr), binaryData)
-
-	return c.Call("QJS_NewArrayBufferCopy", c.Raw(), ptr, uint64(len(binaryData)))
-}
-
-// NewError creates a new JavaScript Error object from Go error.
-func (c *Context) NewError(e error) *Value {
-	errString := c.NewString(e.Error())
-	errVal := c.Call("JS_NewError", c.Raw())
-	errVal.SetPropertyStr("message", errString)
-
-	return errVal
+	return c.Call("QJS_NewProxyValue", c.Raw(), proxyID)
 }
 
 // HasException returns true if there is a pending exception.
@@ -284,6 +291,15 @@ func (c *Context) Exception() error {
 	defer val.Free()
 
 	return val.Exception()
+}
+
+// NewError creates a new JavaScript Error object from Go error.
+func (c *Context) NewError(e error) *Value {
+	errString := c.NewString(e.Error())
+	errVal := c.Call("JS_NewError", c.Raw())
+	errVal.SetPropertyStr("message", errString)
+
+	return errVal
 }
 
 // Throw throws a value as an exception.
@@ -346,57 +362,41 @@ func (c *Context) ThrowInternalError(format string, args ...any) *Value {
 	return c.Call("QJS_ThrowInternalError", c.Raw(), causePtr.Raw())
 }
 
-// Function creates a JavaScript function that wraps the given Go function.
-func (c *Context) Function(fn Function, isAsyncs ...bool) *Value {
-	isAsync := uint64(0)
-	if len(isAsyncs) > 0 && isAsyncs[0] {
-		isAsync = 1
-	}
-
-	fnID := c.runtime.registry.Register(fn)
-	ctxID := c.runtime.registry.Register(c)
-	proxyFuncVal := c.Call("QJS_CreateFunctionProxy", c.Raw(), fnID, ctxID, isAsync)
-
-	// Registry: Store IDs for cleanup and callback identification
-	proxyFuncVal.SetPropertyStr("__fnID", c.NewInt64(int64(fnID)))
-	proxyFuncVal.SetPropertyStr("__ctxID", c.NewInt64(int64(ctxID)))
-
-	return proxyFuncVal
+func (c *Context) Call(name string, args ...uint64) *Value {
+	return c.NewValue(c.runtime.Call(name, args...))
 }
 
-// Invoke invokes a function with given this value and arguments.
-func (c *Context) Invoke(fn *Value, this *Value, args ...*Value) (*Value, error) {
-	argc, argvPtr := createJsCallArgs(c, args...)
-	defer c.FreeHandle(argvPtr)
-
-	jsCallArgs := []uint64{
-		c.Raw(),
-		fn.Raw(),
-		this.Raw(),
-		argc,
-		argvPtr,
-	}
-	result := c.Call("QJS_Call", jsCallArgs...)
-
-	return normalizeJsValue(c, result)
+// CallUnPack delegates function calls and unpacks the result.
+func (c *Context) CallUnPack(name string, args ...uint64) (uint32, uint32) {
+	return c.runtime.CallUnPack(name, args...)
 }
 
-// createJsCallArgs marshals Go Value arguments to WASM memory for JavaScript calls.
-func createJsCallArgs(c *Context, args ...*Value) (uint64, uint64) {
-	var argvPtr uint64
+// NewValue creates a new Value wrapper around the given handle.
+func (c *Context) NewValue(handle *Handle) *Value {
+	return &Value{context: c, handle: handle}
+}
 
-	argc := uint64(len(args))
-	if argc > 0 {
-		argvBytes := make([]byte, Uint64ByteSize*argc)
-		for i, v := range args {
-			// WASM: Pack 64-bit JSValue handles in little-endian format
-			binary.LittleEndian.PutUint64(argvBytes[i*Uint64ByteSize:], v.Raw())
-		}
+// Malloc allocates memory in the WASM runtime.
+func (c *Context) Malloc(size uint64) uint64 {
+	return c.runtime.Malloc(size)
+}
 
-		// WASM: Allocate and write argument array to memory
-		argvPtr = c.Malloc(uint64(len(argvBytes)))
-		c.MemWrite(uint32(argvPtr), argvBytes)
-	}
+// MemRead reads bytes from WASM memory at the given address.
+func (c *Context) MemRead(addr uint32, size uint64) []byte {
+	return c.runtime.mem.MustRead(addr, size)
+}
 
-	return argc, argvPtr
+// MemWrite writes bytes to WASM memory at the given address.
+func (c *Context) MemWrite(addr uint32, b []byte) {
+	c.runtime.mem.MustWrite(addr, b)
+}
+
+// FreeHandle releases memory associated with the given handle pointer.
+func (c *Context) FreeHandle(ptr uint64) {
+	c.runtime.FreeHandle(ptr)
+}
+
+// FreeJsValue releases memory associated with the JavaScript value.
+func (c *Context) FreeJsValue(val uint64) {
+	c.runtime.FreeJsValue(val)
 }

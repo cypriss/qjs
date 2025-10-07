@@ -10,31 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// allocateMemoryPtr allocates memory and returns a uint32 pointer
-func allocateMemoryPtr(t *testing.T, runtime *qjs.Runtime, size uint64) uint32 {
-	ptr := runtime.Malloc(size)
-	t.Cleanup(func() { runtime.FreeHandle(ptr) })
-	return uint32(ptr)
-}
-
-// generateTestPattern creates a test data pattern of specified size
-func generateTestPattern(size int) []byte {
-	data := make([]byte, size)
-	for i := range data {
-		data[i] = byte(i % 256)
-	}
-	return data
-}
-
-// createPackedPtr creates a packed pointer with given address and size
-func createPackedPtr(t *testing.T, runtime *qjs.Runtime, addr, size uint32) uint64 {
-	packedValue := uint64(addr)<<32 | uint64(size)
-	packedPtr := allocateMemoryPtr(t, runtime, 8)
-	err := runtime.Mem().WriteUint64(packedPtr, packedValue)
-	require.NoError(t, err)
-	return uint64(packedPtr)
-}
-
 // memTestUtil provides common memory testing utilities
 type memTestUtil struct {
 	t       *testing.T
@@ -106,6 +81,31 @@ type pointerTest struct {
 	expectSize  uint32
 	shouldPanic bool
 	testString  string
+}
+
+// allocateMemoryPtr allocates memory and returns a uint32 pointer
+func allocateMemoryPtr(t *testing.T, runtime *qjs.Runtime, size uint64) uint32 {
+	ptr := runtime.Malloc(size)
+	t.Cleanup(func() { runtime.FreeHandle(ptr) })
+	return uint32(ptr)
+}
+
+// generateTestPattern creates a test data pattern of specified size
+func generateTestPattern(size int) []byte {
+	data := make([]byte, size)
+	for i := range data {
+		data[i] = byte(i % 256)
+	}
+	return data
+}
+
+// createPackedPtr creates a packed pointer with given address and size
+func createPackedPtr(t *testing.T, runtime *qjs.Runtime, addr, size uint32) uint64 {
+	packedValue := uint64(addr)<<32 | uint64(size)
+	packedPtr := allocateMemoryPtr(t, runtime, 8)
+	err := runtime.Mem().WriteUint64(packedPtr, packedValue)
+	require.NoError(t, err)
+	return uint64(packedPtr)
 }
 
 // Main test functions with improved structure and names

@@ -118,29 +118,47 @@ func TestNewProxyErr(t *testing.T) {
 	})
 }
 
-func TestNewJsToGoErr_JSONStringifyFailure(t *testing.T) {
-	// This test requires a runtime to create a Value that fails JSONStringify
+func TestNewJsToGoErr(t *testing.T) {
 	rt, err := New()
 	require.NoError(t, err)
 	defer rt.Close()
 
-	// Create a Value that will fail JSONStringify (circular reference)
-	result, err := rt.Eval("test.js", Code(`
+	ctx := rt.Context()
+
+	t.Run("JSONStringify failure path", func(t *testing.T) {
+		// Create a value that will cause JSONStringify to fail
+		circularValue := createCircularValue(ctx)
+		defer circularValue.Free()
+
+		// This should hit the JSONStringify error path and use fallback
+		result := newJsToGoErr(circularValue, errors.New("test error"))
+		assert.Error(t, result)
+		assert.Contains(t, result.Error(), "test error")
+		// Should use String() as fallback when JSONStringify fails
+		assert.Contains(t, result.Error(), "[object Object]")
+	})
+
+	t.Run("successful JSONStringify", func(t *testing.T) {
+		value := ctx.NewString("hello")
+		defer value.Free()
+
+		result := newJsToGoErr(value, errors.New("test error"))
+		assert.Error(t, result)
+		assert.Contains(t, result.Error(), `"hello"`)
+		assert.Contains(t, result.Error(), "test error")
+	})
+}
+
+func createCircularValue(ctx *Context) *Value {
+	result, err := ctx.Eval("test.js", Code(`
 		const obj = {};
-		obj.self = obj; // circular reference
+		obj.self = obj;
 		obj
 	`))
-	require.NoError(t, err)
-	defer result.Free()
-
-	// This should trigger the JSONStringify failure path
-	jsErr := newJsToGoErr(result, errors.New("conversion failed"), "test details")
-
-	assert.Error(t, jsErr)
-	assert.Contains(t, jsErr.Error(), "conversion failed")
-	assert.Contains(t, jsErr.Error(), "test details")
-	// Should contain fallback string representation
-	assert.Contains(t, jsErr.Error(), "[object Object]")
+	if err != nil {
+		panic(err)
+	}
+	return result
 }
 
 func TestNewJsToGoErr_EmptyErrorConditions(t *testing.T) {
@@ -179,47 +197,48 @@ func TestNewJsToGoErr_EmptyErrorConditions(t *testing.T) {
 	})
 }
 
-func createCircularValue(ctx *Context) *Value {
-	result, err := ctx.Eval("test.js", Code(`
+func TestNewJsToGoErr_JSONStringifyFailure(t *testing.T) {
+	// This test requires a runtime to create a Value that fails JSONStringify
+	rt, err := New()
+	require.NoError(t, err)
+	defer rt.Close()
+
+	// Create a Value that will fail JSONStringify (circular reference)
+	result, err := rt.Eval("test.js", Code(`
 		const obj = {};
-		obj.self = obj;
+		obj.self = obj; // circular reference
 		obj
 	`))
-	if err != nil {
-		panic(err)
-	}
-	return result
+	require.NoError(t, err)
+	defer result.Free()
+
+	// This should trigger the JSONStringify failure path
+	jsErr := newJsToGoErr(result, errors.New("conversion failed"), "test details")
+
+	assert.Error(t, jsErr)
+	assert.Contains(t, jsErr.Error(), "conversion failed")
+	assert.Contains(t, jsErr.Error(), "test details")
+	// Should contain fallback string representation
+	assert.Contains(t, jsErr.Error(), "[object Object]")
 }
 
-func TestNewJsToGoErr(t *testing.T) {
+func TestNewInvalidJsInputErr_SuccessfulJSONStringify(t *testing.T) {
 	rt, err := New()
 	require.NoError(t, err)
 	defer rt.Close()
 
 	ctx := rt.Context()
 
-	t.Run("JSONStringify failure path", func(t *testing.T) {
-		// Create a value that will cause JSONStringify to fail
-		circularValue := createCircularValue(ctx)
-		defer circularValue.Free()
+	// Create a simple value that JSONStringify will work on
+	value := ctx.NewString("test string")
+	defer value.Free()
 
-		// This should hit the JSONStringify error path and use fallback
-		result := newJsToGoErr(circularValue, errors.New("test error"))
-		assert.Error(t, result)
-		assert.Contains(t, result.Error(), "test error")
-		// Should use String() as fallback when JSONStringify fails
-		assert.Contains(t, result.Error(), "[object Object]")
-	})
+	result := newInvalidJsInputErr("number", value)
 
-	t.Run("successful JSONStringify", func(t *testing.T) {
-		value := ctx.NewString("hello")
-		defer value.Free()
-
-		result := newJsToGoErr(value, errors.New("test error"))
-		assert.Error(t, result)
-		assert.Contains(t, result.Error(), `"hello"`)
-		assert.Contains(t, result.Error(), "test error")
-	})
+	assert.Error(t, result)
+	assert.Contains(t, result.Error(), "expected JS number")
+	assert.Contains(t, result.Error(), `"test string"`) // Successful JSONStringify
+	assert.NotContains(t, result.Error(), "JSONStringify failed")
 }
 
 func TestNewInvalidJsInputErr_JSONStringifyFailure(t *testing.T) {
@@ -243,23 +262,4 @@ func TestNewInvalidJsInputErr_JSONStringifyFailure(t *testing.T) {
 	assert.Contains(t, result.Error(), "expected JS array")
 	assert.Contains(t, result.Error(), "JSONStringify failed:")
 	assert.Contains(t, result.Error(), "[object Object]") // Fallback String() representation
-}
-
-func TestNewInvalidJsInputErr_SuccessfulJSONStringify(t *testing.T) {
-	rt, err := New()
-	require.NoError(t, err)
-	defer rt.Close()
-
-	ctx := rt.Context()
-
-	// Create a simple value that JSONStringify will work on
-	value := ctx.NewString("test string")
-	defer value.Free()
-
-	result := newInvalidJsInputErr("number", value)
-
-	assert.Error(t, result)
-	assert.Contains(t, result.Error(), "expected JS number")
-	assert.Contains(t, result.Error(), `"test string"`) // Successful JSONStringify
-	assert.NotContains(t, result.Error(), "JSONStringify failed")
 }

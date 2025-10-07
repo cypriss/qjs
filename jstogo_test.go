@@ -24,52 +24,6 @@ func (seu *StringifyErrorUnmarshaler) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func validateCircularReference(t *testing.T, err error) {
-	t.Helper()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "circular reference")
-}
-
-func TestJsBigIntToGo(t *testing.T) {
-	rt := must(qjs.New())
-	defer rt.Close()
-
-	result := must(rt.Eval("test.js", qjs.Code(`({ bigInt: BigInt(1234567890), notBigInt: "not a big int" })`)))
-	defer result.Free()
-
-	jsBigInt := result.GetPropertyStr("bigInt")
-	defer jsBigInt.Free()
-
-	t.Run("not_a_bigInt", func(t *testing.T) {
-		notBigInt := result.GetPropertyStr("notBigInt")
-		defer notBigInt.Free()
-		val, err := qjs.JsBigIntToGo[int64](notBigInt)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot convert JS BigInt")
-		assert.Equal(t, int64(0), val)
-	})
-
-	t.Run("convert_to_big_int_pointer", func(t *testing.T) {
-		val := must(qjs.JsBigIntToGo[*big.Int](jsBigInt))
-		assert.IsType(t, (*big.Int)(nil), val)
-		assert.Equal(t, big.NewInt(int64(1234567890)), val)
-	})
-
-	t.Run("convert_to_big_int_value", func(t *testing.T) {
-		val := must(qjs.JsBigIntToGo[big.Int](jsBigInt))
-		assert.IsType(t, big.Int{}, val)
-		expected := *big.NewInt(int64(1234567890))
-		assert.Equal(t, expected, val)
-	})
-
-	t.Run("unsupported_type", func(t *testing.T) {
-		val, err := qjs.JsBigIntToGo[int64](jsBigInt)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "expected GO target *big.Int/big.Int")
-		assert.Equal(t, int64(0), val)
-	})
-}
-
 func TestJsNumberToGo(t *testing.T) {
 	rt := must(qjs.New())
 	defer rt.Close()
@@ -278,6 +232,46 @@ func TestJsNumberToGo(t *testing.T) {
 				}
 			})
 		}
+	})
+}
+
+func TestJsBigIntToGo(t *testing.T) {
+	rt := must(qjs.New())
+	defer rt.Close()
+
+	result := must(rt.Eval("test.js", qjs.Code(`({ bigInt: BigInt(1234567890), notBigInt: "not a big int" })`)))
+	defer result.Free()
+
+	jsBigInt := result.GetPropertyStr("bigInt")
+	defer jsBigInt.Free()
+
+	t.Run("not_a_bigInt", func(t *testing.T) {
+		notBigInt := result.GetPropertyStr("notBigInt")
+		defer notBigInt.Free()
+		val, err := qjs.JsBigIntToGo[int64](notBigInt)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot convert JS BigInt")
+		assert.Equal(t, int64(0), val)
+	})
+
+	t.Run("convert_to_big_int_pointer", func(t *testing.T) {
+		val := must(qjs.JsBigIntToGo[*big.Int](jsBigInt))
+		assert.IsType(t, (*big.Int)(nil), val)
+		assert.Equal(t, big.NewInt(int64(1234567890)), val)
+	})
+
+	t.Run("convert_to_big_int_value", func(t *testing.T) {
+		val := must(qjs.JsBigIntToGo[big.Int](jsBigInt))
+		assert.IsType(t, big.Int{}, val)
+		expected := *big.NewInt(int64(1234567890))
+		assert.Equal(t, expected, val)
+	})
+
+	t.Run("unsupported_type", func(t *testing.T) {
+		val, err := qjs.JsBigIntToGo[int64](jsBigInt)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "expected GO target *big.Int/big.Int")
+		assert.Equal(t, int64(0), val)
 	})
 }
 
@@ -2531,54 +2525,6 @@ func TestJsValueToGo(t *testing.T) {
 	}
 }
 
-func TestCircularReferenceDetection(t *testing.T) {
-	rt := must(qjs.New())
-	defer rt.Close()
-
-	circularReferenceTests := []struct {
-		name     string
-		testFunc func(*qjs.Value) error
-		desc     string
-	}{
-		{
-			name: "circular_reference_in_struct_conversion",
-			testFunc: func(result *qjs.Value) error {
-				type TestStruct struct {
-					Name string         `json:"name"`
-					Self map[string]any `json:"self"`
-				}
-				var testStruct TestStruct
-				_, err := qjs.JsObjectOrMapToGoStruct(result, testStruct)
-				return err
-			},
-			desc: "Tests struct conversion circular reference detection",
-		},
-		{
-			name: "circular_reference_in_map_conversion",
-			testFunc: func(result *qjs.Value) error {
-				var testMap map[string]any
-				_, err := qjs.JsObjectOrMapToGoMap(result, testMap)
-				return err
-			},
-			desc: "Tests map conversion circular reference detection",
-		},
-	}
-
-	for _, tc := range circularReferenceTests {
-		t.Run(tc.name, func(t *testing.T) {
-			result := must(rt.Eval("test.js", qjs.Code(`
-				var obj = { name: "test" };
-				obj.self = obj; // circular reference
-				obj;
-			`)))
-			defer result.Free()
-
-			err := tc.testFunc(result)
-			validateCircularReference(t, err)
-		})
-	}
-}
-
 func TestStringToBoolConversion(t *testing.T) {
 	rt := must(qjs.New())
 	defer rt.Close()
@@ -2594,22 +2540,6 @@ func TestStringToBoolConversion(t *testing.T) {
 	defer emptyResult.Free()
 	converted2 := must(qjs.JsValueToGo(emptyResult, boolVal))
 	assert.False(t, converted2)
-}
-
-func TestErrorValueHandling(t *testing.T) {
-	rt := must(qjs.New())
-	defer rt.Close()
-
-	obj := rt.Context().NewObject()
-	defer obj.Free()
-
-	errorValue := obj.CallConstructor()
-	defer errorValue.Free()
-
-	assert.True(t, errorValue.IsError())
-	converted := must(qjs.JsValueToGo[error](errorValue))
-	assert.Error(t, converted)
-	assert.Contains(t, converted.Error(), "not a constructor")
 }
 
 func TestStringToNumericConversion(t *testing.T) {
@@ -2687,4 +2617,74 @@ func TestStringToNumericConversion(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestErrorValueHandling(t *testing.T) {
+	rt := must(qjs.New())
+	defer rt.Close()
+
+	obj := rt.Context().NewObject()
+	defer obj.Free()
+
+	errorValue := obj.CallConstructor()
+	defer errorValue.Free()
+
+	assert.True(t, errorValue.IsError())
+	converted := must(qjs.JsValueToGo[error](errorValue))
+	assert.Error(t, converted)
+	assert.Contains(t, converted.Error(), "not a constructor")
+}
+
+func validateCircularReference(t *testing.T, err error) {
+	t.Helper()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "circular reference")
+}
+
+func TestCircularReferenceDetection(t *testing.T) {
+	rt := must(qjs.New())
+	defer rt.Close()
+
+	circularReferenceTests := []struct {
+		name     string
+		testFunc func(*qjs.Value) error
+		desc     string
+	}{
+		{
+			name: "circular_reference_in_struct_conversion",
+			testFunc: func(result *qjs.Value) error {
+				type TestStruct struct {
+					Name string         `json:"name"`
+					Self map[string]any `json:"self"`
+				}
+				var testStruct TestStruct
+				_, err := qjs.JsObjectOrMapToGoStruct(result, testStruct)
+				return err
+			},
+			desc: "Tests struct conversion circular reference detection",
+		},
+		{
+			name: "circular_reference_in_map_conversion",
+			testFunc: func(result *qjs.Value) error {
+				var testMap map[string]any
+				_, err := qjs.JsObjectOrMapToGoMap(result, testMap)
+				return err
+			},
+			desc: "Tests map conversion circular reference detection",
+		},
+	}
+
+	for _, tc := range circularReferenceTests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := must(rt.Eval("test.js", qjs.Code(`
+				var obj = { name: "test" };
+				obj.self = obj; // circular reference
+				obj;
+			`)))
+			defer result.Free()
+
+			err := tc.testFunc(result)
+			validateCircularReference(t, err)
+		})
+	}
 }

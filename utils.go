@@ -7,12 +7,21 @@ import (
 	"strings"
 )
 
-func Min(a, b int) int {
-	if a < b {
-		return a
+// IsNumericType checks if a reflect.Type represents a numeric type.
+func IsNumericType(t reflect.Type) bool {
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
 
-	return b
+	switch t.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64,
+		reflect.Complex64, reflect.Complex128:
+		return true
+	default:
+		return false
+	}
 }
 
 func IsImplementError(rtype reflect.Type) bool {
@@ -160,19 +169,10 @@ func IsConvertibleToJs(rType reflect.Type, visited map[reflect.Type]bool, detail
 	return nil
 }
 
-// IsNumericType checks if a reflect.Type represents a numeric type.
-func IsNumericType(t reflect.Type) bool {
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
+func Min(a, b int) int {
+	if a < b {
+		return a
 	}
 
-	switch t.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
-		reflect.Float32, reflect.Float64,
-		reflect.Complex64, reflect.Complex128:
-		return true
-	default:
-		return false
-	}
+	return b
 }

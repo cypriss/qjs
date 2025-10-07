@@ -7,33 +7,6 @@ import (
 	"os"
 )
 
-const (
-	// JsEvalTypeGlobal evaluates code in global scope (default).
-	JsEvalTypeGlobal = (0 << 0)
-
-	// JsEvalTypeModule evaluates code as ES6 module.
-	JsEvalTypeModule = (1 << 0)
-
-	// JsEvalTypeDirect performs direct call (internal use).
-	JsEvalTypeDirect = (2 << 0)
-
-	// JsEvalTypeInDirect performs indirect call (internal use).
-	JsEvalTypeInDirect = (3 << 0)
-
-	JsEvalTypeMask   = (3 << 0) // JsEvalTypeMask masks the eval type bits.
-	JsEvalFlagStrict = (1 << 3) // JsEvalFlagStrict forces strict mode execution.
-	JsEvalFlagUnUsed = (1 << 4) // JsEvalFlagUnUsed is reserved for future use.
-
-	// JsEvalFlagCompileOnly returns a JS bytecode/module for JS_EvalFunction().
-	JsEvalFlagCompileOnly = (1 << 5)
-
-	// JsEvalFlagBackTraceBarrier prevents the stack frames before this eval in the Error() backtraces.
-	JsEvalFlagBackTraceBarrier = (1 << 6)
-
-	// JsEvalFlagAsync enables top-level await (global scope only).
-	JsEvalFlagAsync = (1 << 7)
-)
-
 type Option struct {
 	CWD               string
 	StartFunctionName string
@@ -70,20 +43,32 @@ type EvalOption struct {
 // EvalOptionFunc configures evaluation behavior using functional option pattern.
 type EvalOptionFunc func(*EvalOption)
 
-// createEvalOption initializes default option with global scope and strict mode.
-func createEvalOption(c *Context, file string, flags ...EvalOptionFunc) *EvalOption {
-	evalOption := &EvalOption{
-		c:     c,
-		file:  file,
-		flags: JsEvalTypeGlobal | JsEvalFlagStrict,
-	}
+const (
+	// JsEvalTypeGlobal evaluates code in global scope (default).
+	JsEvalTypeGlobal = (0 << 0)
 
-	for _, flag := range flags {
-		flag(evalOption)
-	}
+	// JsEvalTypeModule evaluates code as ES6 module.
+	JsEvalTypeModule = (1 << 0)
 
-	return evalOption
-}
+	// JsEvalTypeDirect performs direct call (internal use).
+	JsEvalTypeDirect = (2 << 0)
+
+	// JsEvalTypeInDirect performs indirect call (internal use).
+	JsEvalTypeInDirect = (3 << 0)
+
+	JsEvalTypeMask   = (3 << 0) // JsEvalTypeMask masks the eval type bits.
+	JsEvalFlagStrict = (1 << 3) // JsEvalFlagStrict forces strict mode execution.
+	JsEvalFlagUnUsed = (1 << 4) // JsEvalFlagUnUsed is reserved for future use.
+
+	// JsEvalFlagCompileOnly returns a JS bytecode/module for JS_EvalFunction().
+	JsEvalFlagCompileOnly = (1 << 5)
+
+	// JsEvalFlagBackTraceBarrier prevents the stack frames before this eval in the Error() backtraces.
+	JsEvalFlagBackTraceBarrier = (1 << 6)
+
+	// JsEvalFlagAsync enables top-level await (global scope only).
+	JsEvalFlagAsync = (1 << 7)
+)
 
 // Code sets the JavaScript source code to evaluate.
 func Code(code string) EvalOptionFunc {
@@ -114,29 +99,6 @@ func TypeModule() EvalOptionFunc {
 	}
 }
 
-// FlagAsync enables top-level await in global scripts. Returns a promise from JS_Eval(). Only
-// valid with TypeGlobal.
-func FlagAsync() EvalOptionFunc {
-	return func(o *EvalOption) {
-		o.flags |= JsEvalFlagAsync
-	}
-}
-
-// FlagStrict forces strict mode execution.
-func FlagStrict() EvalOptionFunc {
-	return func(o *EvalOption) {
-		o.flags |= JsEvalFlagStrict
-	}
-}
-
-// FlagCompileOnly compiles code without execution. Returns bytecode object for later execution
-// with JS_EvalFunction().
-func FlagCompileOnly() EvalOptionFunc {
-	return func(o *EvalOption) {
-		o.flags |= JsEvalFlagCompileOnly
-	}
-}
-
 // TypeDirect sets direct call mode (internal QuickJS use).
 func TypeDirect() EvalOptionFunc {
 	return func(o *EvalOption) {
@@ -158,10 +120,26 @@ func TypeMask() EvalOptionFunc {
 	}
 }
 
-// FlagUnused is reserved for future QuickJS features.
-func FlagUnused() EvalOptionFunc {
+// FlagStrict forces strict mode execution.
+func FlagStrict() EvalOptionFunc {
 	return func(o *EvalOption) {
-		o.flags |= JsEvalFlagUnUsed
+		o.flags |= JsEvalFlagStrict
+	}
+}
+
+// FlagCompileOnly compiles code without execution. Returns bytecode object for later execution
+// with JS_EvalFunction().
+func FlagCompileOnly() EvalOptionFunc {
+	return func(o *EvalOption) {
+		o.flags |= JsEvalFlagCompileOnly
+	}
+}
+
+// FlagAsync enables top-level await in global scripts. Returns a promise from JS_Eval(). Only
+// valid with TypeGlobal.
+func FlagAsync() EvalOptionFunc {
+	return func(o *EvalOption) {
+		o.flags |= JsEvalFlagAsync
 	}
 }
 
@@ -169,6 +147,13 @@ func FlagUnused() EvalOptionFunc {
 func FlagBacktraceBarrier() EvalOptionFunc {
 	return func(o *EvalOption) {
 		o.flags |= JsEvalFlagBackTraceBarrier
+	}
+}
+
+// FlagUnused is reserved for future QuickJS features.
+func FlagUnused() EvalOptionFunc {
+	return func(o *EvalOption) {
+		o.flags |= JsEvalFlagUnUsed
 	}
 }
 
@@ -247,4 +232,19 @@ func getRuntimeOption(registry *ProxyRegistry, options ...*Option) (option *Opti
 	}
 
 	return option, nil
+}
+
+// createEvalOption initializes default option with global scope and strict mode.
+func createEvalOption(c *Context, file string, flags ...EvalOptionFunc) *EvalOption {
+	evalOption := &EvalOption{
+		c:     c,
+		file:  file,
+		flags: JsEvalTypeGlobal | JsEvalFlagStrict,
+	}
+
+	for _, flag := range flags {
+		flag(evalOption)
+	}
+
+	return evalOption
 }

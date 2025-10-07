@@ -13,16 +13,6 @@ import (
 	wsp1 "github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
-//go:embed qjs.wasm
-var wasmBytes []byte
-
-var (
-	compiledQJSModule   wazero.CompiledModule
-	cachedRuntimeConfig wazero.RuntimeConfig
-	cachedBytesHash     uint64
-	compilationMutex    sync.Mutex
-)
-
 // Runtime wraps a QuickJS WebAssembly runtime with memory management.
 type Runtime struct {
 	wrt      wazero.Runtime
@@ -36,44 +26,24 @@ type Runtime struct {
 	registry *ProxyRegistry
 }
 
-func createGlobalCompiledModule(
-	ctx context.Context,
-	closeOnContextDone bool,
-	disableBuildCache bool,
-	quickjsWasmBytes ...[]byte,
-) (err error) {
-	// Protect global compilation state with mutex
-	compilationMutex.Lock()
-	defer compilationMutex.Unlock()
-
-	var qjsBytes []byte
-	if len(quickjsWasmBytes) > 0 && len(quickjsWasmBytes[0]) > 0 {
-		qjsBytes = quickjsWasmBytes[0]
-	} else {
-		qjsBytes = wasmBytes
-	}
-
-	// Calculate hash of the bytes to check if we need to recompile
-	currentHash := hashBytes(qjsBytes)
-
-	// Check if we need to compile or recompile
-	if compiledQJSModule == nil || cachedBytesHash != currentHash || disableBuildCache {
-		cache := wazero.NewCompilationCache()
-		cachedRuntimeConfig = wazero.
-			NewRuntimeConfig().
-			WithCompilationCache(cache).
-			WithCloseOnContextDone(closeOnContextDone)
-		wrt := wazero.NewRuntimeWithConfig(ctx, cachedRuntimeConfig)
-
-		if compiledQJSModule, err = wrt.CompileModule(ctx, qjsBytes); err != nil {
-			return fmt.Errorf("failed to compile qjs module: %w", err)
-		}
-
-		cachedBytesHash = currentHash
-	}
-
-	return nil
+// Pool manages a collection of reusable QuickJS runtimes.
+type Pool struct {
+	pools      chan *Runtime
+	size       int
+	option     *Option
+	setupFuncs []func(*Runtime) error
+	mu         sync.Mutex
 }
+
+var (
+	compiledQJSModule   wazero.CompiledModule
+	cachedRuntimeConfig wazero.RuntimeConfig
+	cachedBytesHash     uint64
+	compilationMutex    sync.Mutex
+)
+
+//go:embed qjs.wasm
+var wasmBytes []byte
 
 // New creates a QuickJS runtime with optional configuration.
 func New(options ...*Option) (runtime *Runtime, err error) {
@@ -147,70 +117,70 @@ func New(options ...*Option) (runtime *Runtime, err error) {
 	return runtime, nil
 }
 
-// FreeQJSRuntime frees the QJS runtime.
-func (r *Runtime) FreeQJSRuntime() {
-	defer func() {
-		err := AnyToError(recover())
-		if err != nil {
-			panic(fmt.Errorf("failed to free QJS runtime: %w", err))
+func createGlobalCompiledModule(
+	ctx context.Context,
+	closeOnContextDone bool,
+	disableBuildCache bool,
+	quickjsWasmBytes ...[]byte,
+) (err error) {
+	// Protect global compilation state with mutex
+	compilationMutex.Lock()
+	defer compilationMutex.Unlock()
+
+	var qjsBytes []byte
+	if len(quickjsWasmBytes) > 0 && len(quickjsWasmBytes[0]) > 0 {
+		qjsBytes = quickjsWasmBytes[0]
+	} else {
+		qjsBytes = wasmBytes
+	}
+
+	// Calculate hash of the bytes to check if we need to recompile
+	currentHash := hashBytes(qjsBytes)
+
+	// Check if we need to compile or recompile
+	if compiledQJSModule == nil || cachedBytesHash != currentHash || disableBuildCache {
+		cache := wazero.NewCompilationCache()
+		cachedRuntimeConfig = wazero.
+			NewRuntimeConfig().
+			WithCompilationCache(cache).
+			WithCloseOnContextDone(closeOnContextDone)
+		wrt := wazero.NewRuntimeWithConfig(ctx, cachedRuntimeConfig)
+
+		if compiledQJSModule, err = wrt.CompileModule(ctx, qjsBytes); err != nil {
+			return fmt.Errorf("failed to compile qjs module: %w", err)
 		}
-	}()
 
-	r.Call("QJS_Free", r.handle.raw)
+		cachedBytesHash = currentHash
+	}
+
+	return nil
 }
 
-// Mem returns the WebAssembly memory interface for this runtime.
-func (r *Runtime) Mem() *Mem {
-	return r.mem
-}
+// initializeRuntime sets up the runtime components after module instantiation.
+func (r *Runtime) initializeRuntime() {
+	r.malloc = r.module.ExportedFunction("malloc")
+	r.free = r.module.ExportedFunction("free")
+	r.mem = &Mem{mem: r.module.Memory()}
+	r.handle = r.Call(
+		"New_QJS",
+		uint64(r.option.MemoryLimit),
+		uint64(r.option.MaxStackSize),
+		uint64(r.option.MaxExecutionTime),
+		uint64(r.option.GCThreshold),
+	)
 
-// String returns a string representation of the runtime.
-func (r *Runtime) String() string {
-	return fmt.Sprintf("QJSRuntime: %p", r)
-}
-
-// Close cleanly shuts down the runtime and frees all associated resources.
-func (r *Runtime) Close() {
-	if r == nil {
-		return
-	}
-
-	// Free QJS runtime handle
-	if r.handle != nil {
-		r.FreeQJSRuntime()
-		r.handle = nil
-	}
-
-	// Close WASM module
-	if r.module != nil {
-		r.module.Close(r.context)
-		r.module = nil
-	}
-
-	// Clear references
-	if r.context != nil {
-		r.context = nil
-	}
-
-	if r.registry != nil {
-		r.registry.Clear()
-		r.registry = nil
-	}
-
-	// Clear function references
-	r.malloc = nil
-	r.free = nil
-	r.mem = nil
-}
-
-// Load executes a JavaScript file in the runtime's context.
-func (r *Runtime) Load(file string, flags ...EvalOptionFunc) (*Value, error) {
-	return r.context.Load(file, flags...)
+	r.context.handle = r.Call("QJS_GetContext", r.handle.raw)
+	r.context.runtime = r
 }
 
 // Eval executes JavaScript code in the runtime's context.
 func (r *Runtime) Eval(file string, flags ...EvalOptionFunc) (*Value, error) {
 	return r.context.Eval(file, flags...)
+}
+
+// Load executes a JavaScript file in the runtime's context.
+func (r *Runtime) Load(file string, flags ...EvalOptionFunc) (*Value, error) {
+	return r.context.Load(file, flags...)
 }
 
 // Compile compiles JavaScript code to bytecode without executing it.
@@ -226,6 +196,25 @@ func (r *Runtime) Context() *Context {
 // Call invokes a WebAssembly function by name with the given arguments.
 func (r *Runtime) Call(name string, args ...uint64) *Handle {
 	return NewHandle(r, r.call(name, args...))
+}
+
+func (r *Runtime) call(name string, args ...uint64) uint64 {
+	fn := r.module.ExportedFunction(name)
+	if fn == nil {
+		panic(fmt.Errorf("WASM function %s not found", name))
+	}
+
+	results, err := fn.Call(r.context, args...)
+	if err != nil {
+		stack := debug.Stack()
+		panic(fmt.Errorf("failed to call %s: %w\nstack: %s", name, err, stack))
+	}
+
+	if len(results) == 0 {
+		return 0
+	}
+
+	return results[0]
 }
 
 // CallUnPack calls a WebAssembly function and unpacks the returned pointer.
@@ -280,49 +269,60 @@ func (r *Runtime) NewStringHandle(v string) *Handle {
 	return NewHandle(r, ptr)
 }
 
-// initializeRuntime sets up the runtime components after module instantiation.
-func (r *Runtime) initializeRuntime() {
-	r.malloc = r.module.ExportedFunction("malloc")
-	r.free = r.module.ExportedFunction("free")
-	r.mem = &Mem{mem: r.module.Memory()}
-	r.handle = r.Call(
-		"New_QJS",
-		uint64(r.option.MemoryLimit),
-		uint64(r.option.MaxStackSize),
-		uint64(r.option.MaxExecutionTime),
-		uint64(r.option.GCThreshold),
-	)
-
-	r.context.handle = r.Call("QJS_GetContext", r.handle.raw)
-	r.context.runtime = r
+// Mem returns the WebAssembly memory interface for this runtime.
+func (r *Runtime) Mem() *Mem {
+	return r.mem
 }
 
-func (r *Runtime) call(name string, args ...uint64) uint64 {
-	fn := r.module.ExportedFunction(name)
-	if fn == nil {
-		panic(fmt.Errorf("WASM function %s not found", name))
-	}
-
-	results, err := fn.Call(r.context, args...)
-	if err != nil {
-		stack := debug.Stack()
-		panic(fmt.Errorf("failed to call %s: %w\nstack: %s", name, err, stack))
-	}
-
-	if len(results) == 0 {
-		return 0
-	}
-
-	return results[0]
+// String returns a string representation of the runtime.
+func (r *Runtime) String() string {
+	return fmt.Sprintf("QJSRuntime: %p", r)
 }
 
-// Pool manages a collection of reusable QuickJS runtimes.
-type Pool struct {
-	pools      chan *Runtime
-	size       int
-	option     *Option
-	setupFuncs []func(*Runtime) error
-	mu         sync.Mutex
+// FreeQJSRuntime frees the QJS runtime.
+func (r *Runtime) FreeQJSRuntime() {
+	defer func() {
+		err := AnyToError(recover())
+		if err != nil {
+			panic(fmt.Errorf("failed to free QJS runtime: %w", err))
+		}
+	}()
+
+	r.Call("QJS_Free", r.handle.raw)
+}
+
+// Close cleanly shuts down the runtime and frees all associated resources.
+func (r *Runtime) Close() {
+	if r == nil {
+		return
+	}
+
+	// Free QJS runtime handle
+	if r.handle != nil {
+		r.FreeQJSRuntime()
+		r.handle = nil
+	}
+
+	// Close WASM module
+	if r.module != nil {
+		r.module.Close(r.context)
+		r.module = nil
+	}
+
+	// Clear references
+	if r.context != nil {
+		r.context = nil
+	}
+
+	if r.registry != nil {
+		r.registry.Clear()
+		r.registry = nil
+	}
+
+	// Clear function references
+	r.malloc = nil
+	r.free = nil
+	r.mem = nil
 }
 
 // NewPool creates a new runtime pool with the specified size and configuration.
@@ -372,27 +372,6 @@ func (p *Pool) Get() (*Runtime, error) {
 	}
 }
 
-// Put returns the runtime back to the pool for reuse. If the pool is full, the runtime is
-// closed to prevent resource leaks.
-func (p *Pool) Put(rt *Runtime) {
-	if rt == nil {
-		return
-	}
-
-	// Update stack top before returning to pool
-	if rt.handle != nil {
-		rt.Call("QJS_UpdateStackTop", rt.handle.raw)
-	}
-
-	select {
-	case p.pools <- rt:
-		// Successfully returned to pool
-	default:
-		// Pool is full, close the runtime
-		rt.Close()
-	}
-}
-
 // prepareRuntimeForUse prepares a pooled runtime for use.
 func (p *Pool) prepareRuntimeForUse(rt *Runtime) *Runtime {
 	if rt != nil && rt.handle != nil {
@@ -420,4 +399,25 @@ func (p *Pool) createNewRuntime() (*Runtime, error) {
 	}
 
 	return rt, nil
+}
+
+// Put returns the runtime back to the pool for reuse. If the pool is full, the runtime is
+// closed to prevent resource leaks.
+func (p *Pool) Put(rt *Runtime) {
+	if rt == nil {
+		return
+	}
+
+	// Update stack top before returning to pool
+	if rt.handle != nil {
+		rt.Call("QJS_UpdateStackTop", rt.handle.raw)
+	}
+
+	select {
+	case p.pools <- rt:
+		// Successfully returned to pool
+	default:
+		// Pool is full, close the runtime
+		rt.Close()
+	}
 }

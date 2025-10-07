@@ -12,6 +12,70 @@ import (
 	"time"
 )
 
+type NumberType interface {
+	int |
+		int8 |
+		int16 |
+		int32 |
+		int64 |
+		uint |
+		uint8 |
+		uint16 |
+		uint32 |
+		uint64 |
+		uintptr |
+		float32 |
+		float64
+}
+
+// ObjectOrMap interface for unified object/map handling.
+type ObjectOrMap interface {
+	IsObject() bool
+	IsMap() bool
+	ToMap() *Map
+	JSONStringify() (string, error)
+	IsNull() bool
+	ForEach(callback func(*Value, *Value))
+}
+
+// FieldPath stores the path to a field through embedded structs.
+type FieldPath struct {
+	indices []int               // Path to the field through embedded structs
+	field   reflect.StructField // Field info
+}
+
+// FieldMapper handles struct field mapping with caching for performance.
+type FieldMapper struct {
+	mu    sync.RWMutex
+	cache map[reflect.Type]map[string]FieldPath
+}
+
+// Tracker tracks objects during Go-JS conversion to detect circular references.
+type Tracker[T uintptr | uint64] struct {
+	processing map[T]bool
+}
+
+// CircularTracker manages the lifecycle of circular reference tracking for a single object.
+type CircularTracker[T uintptr | uint64] struct {
+	ctx             *Tracker[T]
+	ptr             T
+	needsUnregister bool
+}
+
+// JsNumericToGoConverter handles conversion from float64 to various numeric types.
+type JsNumericToGoConverter struct {
+	targetType reflect.Type
+	isPointer  bool
+}
+
+// JsArrayToGoConverter handles array conversions with better error handling and performance.
+type JsArrayToGoConverter[T any] struct {
+	tracker    *Tracker[uint64]
+	input      *Value
+	targetType reflect.Type
+	sample     T
+}
+
 const (
 	// MinMapForeachArgs is the minimum number of arguments for Map forEach callback (value, key).
 	MinMapForeachArgs = 2
@@ -34,22 +98,6 @@ const (
 	// StringTerminator is the null terminator byte for C-style strings.
 	StringTerminator = byte(0)
 )
-
-type NumberType interface {
-	int |
-		int8 |
-		int16 |
-		int32 |
-		int64 |
-		uint |
-		uint8 |
-		uint16 |
-		uint32 |
-		uint64 |
-		uintptr |
-		float32 |
-		float64
-}
 
 var (
 	// Overflow bounds for numeric types.
@@ -82,27 +130,8 @@ var (
 	}
 )
 
-// ObjectOrMap interface for unified object/map handling.
-type ObjectOrMap interface {
-	IsObject() bool
-	IsMap() bool
-	ToMap() *Map
-	JSONStringify() (string, error)
-	IsNull() bool
-	ForEach(callback func(*Value, *Value))
-}
-
-// FieldMapper handles struct field mapping with caching for performance.
-type FieldMapper struct {
-	mu    sync.RWMutex
-	cache map[reflect.Type]map[string]FieldPath
-}
-
-// FieldPath stores the path to a field through embedded structs.
-type FieldPath struct {
-	indices []int               // Path to the field through embedded structs
-	field   reflect.StructField // Field info
-}
+// Global field mapper instance for backward compatibility.
+var globalFieldMapper = NewFieldMapper()
 
 // NewFieldMapper creates a new field mapper with initialized cache.
 func NewFieldMapper() *FieldMapper {
@@ -110,9 +139,6 @@ func NewFieldMapper() *FieldMapper {
 		cache: make(map[reflect.Type]map[string]FieldPath),
 	}
 }
-
-// Global field mapper instance for backward compatibility.
-var globalFieldMapper = NewFieldMapper()
 
 // GetFieldMap returns or builds a field map for a struct type.
 func (fm *FieldMapper) GetFieldMap(structType reflect.Type) map[string]FieldPath {
@@ -214,11 +240,6 @@ func getFieldMap(structType reflect.Type) map[string]FieldPath {
 	return globalFieldMapper.GetFieldMap(structType)
 }
 
-// Tracker tracks objects during Go-JS conversion to detect circular references.
-type Tracker[T uintptr | uint64] struct {
-	processing map[T]bool
-}
-
 // NewTracker creates a new conversion context for tracking circular references.
 func NewTracker[T uintptr | uint64]() *Tracker[T] {
 	return &Tracker[T]{
@@ -241,13 +262,6 @@ func (tracker *Tracker[T]) Track(ptr T) bool {
 // UnTrack removes an object from circular reference tracking.
 func (tracker *Tracker[T]) UnTrack(ptr T) {
 	delete(tracker.processing, ptr)
-}
-
-// CircularTracker manages the lifecycle of circular reference tracking for a single object.
-type CircularTracker[T uintptr | uint64] struct {
-	ctx             *Tracker[T]
-	ptr             T
-	needsUnregister bool
 }
 
 // trackPtr sets up circular reference tracking for a pointer.
@@ -286,12 +300,6 @@ func (ct *CircularTracker[T]) cleanup() {
 	}
 }
 
-// JsNumericToGoConverter handles conversion from float64 to various numeric types.
-type JsNumericToGoConverter struct {
-	targetType reflect.Type
-	isPointer  bool
-}
-
 func NewJsNumericToGoConverter(targetType reflect.Type) *JsNumericToGoConverter {
 	isPointer := targetType.Kind() == reflect.Ptr
 	if isPointer {
@@ -322,14 +330,6 @@ func (nc *JsNumericToGoConverter) Convert(floatVal float64) (any, error) {
 	}
 
 	return result, nil
-}
-
-// JsArrayToGoConverter handles array conversions with better error handling and performance.
-type JsArrayToGoConverter[T any] struct {
-	tracker    *Tracker[uint64]
-	input      *Value
-	targetType reflect.Type
-	sample     T
 }
 
 func NewJsArrayToGoConverter[T any](input *Value, samples ...T) *JsArrayToGoConverter[T] {
@@ -527,6 +527,22 @@ func FloatToInt(floatVal float64, targetKind reflect.Kind) (any, error) {
 	return result, nil
 }
 
+func NumericBoundsCheck(floatVal float64, targetKind reflect.Kind) error {
+	if bounds, ok := numericBounds[targetKind]; ok {
+		if floatVal < bounds[0] || floatVal > bounds[1] {
+			return newOverflowErr(floatVal, targetKind.String())
+		}
+	}
+
+	// Special handling for int/uint on 32-bit platforms
+	isIntUint := targetKind == reflect.Int || targetKind == reflect.Uint
+	if isIntUint && Is32BitPlatform() {
+		return IsValid32BitFloat(floatVal, targetKind)
+	}
+
+	return nil
+}
+
 func IsValid32BitFloat(floatVal float64, targetKind reflect.Kind) error {
 	var bounds [2]float64
 	if targetKind == reflect.Int {
@@ -542,20 +558,9 @@ func IsValid32BitFloat(floatVal float64, targetKind reflect.Kind) error {
 	return nil
 }
 
-func NumericBoundsCheck(floatVal float64, targetKind reflect.Kind) error {
-	if bounds, ok := numericBounds[targetKind]; ok {
-		if floatVal < bounds[0] || floatVal > bounds[1] {
-			return newOverflowErr(floatVal, targetKind.String())
-		}
-	}
-
-	// Special handling for int/uint on 32-bit platforms
-	isIntUint := targetKind == reflect.Int || targetKind == reflect.Uint
-	if isIntUint && Is32BitPlatform() {
-		return IsValid32BitFloat(floatVal, targetKind)
-	}
-
-	return nil
+// Is32BitPlatform check if the platform is 32-bit by comparing the size of uintptr.
+func Is32BitPlatform() bool {
+	return strconv.IntSize == 32
 }
 
 // IsTypedArray returns true if the input is TypedArray or DataView.
@@ -605,6 +610,19 @@ func processTempValue[T any](prefix string, temp any, err error, samples ...T) (
 	valueT, _ := temp.(T)
 
 	return valueT, nil
+}
+
+func createTemp[T any](samples ...T) (any, T) {
+	var (
+		tempValue any
+		sample    T
+	)
+
+	if len(samples) > 0 {
+		sample = samples[0]
+	}
+
+	return tempValue, sample
 }
 
 func StringToNumeric(s string, targetType reflect.Type) (result any, err error) {
@@ -748,19 +766,6 @@ func canConvertToGoNumber(input *Value) error {
 	return nil
 }
 
-func createTemp[T any](samples ...T) (any, T) {
-	var (
-		tempValue any
-		sample    T
-	)
-
-	if len(samples) > 0 {
-		sample = samples[0]
-	}
-
-	return tempValue, sample
-}
-
 func isFloatWholeNumber(floatVal float64) bool {
 	return floatVal == float64(int64(floatVal)) &&
 		floatVal >= math.MinInt64 &&
@@ -874,11 +879,6 @@ func ParseTimezone(tz string) *time.Location {
 
 	// Fallback to UTC if parsing fails
 	return time.UTC
-}
-
-// Is32BitPlatform check if the platform is 32-bit by comparing the size of uintptr.
-func Is32BitPlatform() bool {
-	return strconv.IntSize == 32
 }
 
 // ChannelToJSObjectValue converts a Go channel to a JavaScript object with async methods.

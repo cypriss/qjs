@@ -267,6 +267,75 @@ func TestValueTypeChecks(t *testing.T) {
 	})
 }
 
+func TestValueType(t *testing.T) {
+	rt, ctx := setupTestContext(t)
+	defer rt.Close()
+
+	testCases := []struct {
+		name         string
+		code         string
+		value        *qjs.Value
+		expectedType string
+		allowedTypes []string
+	}{
+		{"Symbol", "Symbol('test')", nil, "Symbol", nil},
+		{"NaN", "NaN", nil, "NaN", nil},
+		{"Infinity", "Infinity", nil, "Infinity", nil},
+		{"BigInt", "123n", nil, "BigInt", nil},
+		{"Number", "42", nil, "Number", nil},
+		{"Date", "new Date()", nil, "Date", nil},
+		{"Boolean", "true", nil, "Boolean", nil},
+		{"Null", "null", nil, "Null", nil},
+		{"Undefined", "undefined", nil, "Undefined", nil},
+		{"String", "'hello'", nil, "String", nil},
+		{"Array", "[]", nil, "Array", nil},
+		{"Map", "new Map()", nil, "Map", nil},
+		{"Set", "new Set()", nil, "Set", nil},
+		{"Constructor", "Array", nil, "Constructor", []string{"Constructor Array"}},
+		{"Function", "(() => 42)", nil, "Function", []string{"Constructor"}},
+		{"ArrayBuffer", "new ArrayBuffer(8)", nil, "ArrayBuffer", nil},
+
+		{"IsUninitialized", "", ctx.NewUninitialized(), "Uninitialized", nil},
+		{"Error", "", ctx.NewError(errors.New("some error")), "Error", nil},
+		{"ProxyValue", "", ctx.NewProxyValue(42), "QJSProxyValue", nil},
+
+		{"unknown", "({})", nil, "unknown", nil},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var val *qjs.Value
+			if tc.value != nil {
+				val = tc.value
+			} else {
+				val = must(ctx.Eval("test.js", qjs.Code(tc.code)))
+			}
+
+			defer val.Free()
+
+			actualType := val.Type()
+			validTypes := append([]string{tc.expectedType}, tc.allowedTypes...)
+			matched := slices.Contains(validTypes, actualType)
+
+			assert.True(t, matched,
+				"Code '%s' expected type in %v but got '%s'",
+				tc.code, validTypes, actualType)
+		})
+	}
+
+	t.Run("PromiseType", func(t *testing.T) {
+		result := must(ctx.Eval("test.js", qjs.Code(`({
+			promise: new Promise((resolve) => resolve(42))
+		})`)))
+		defer result.Free()
+
+		promise := result.GetPropertyStr("promise")
+		defer promise.Resolve()
+		defer promise.Free()
+		assert.Equal(t, "Promise", promise.Type())
+	})
+}
+
 func TestValueConversions(t *testing.T) {
 	rt, ctx := setupTestContext(t)
 	defer rt.Close()
@@ -706,75 +775,6 @@ func TestValueArrayBufferOperations(t *testing.T) {
 		defer arr.Free()
 
 		assert.Equal(t, int64(5), arr.Len())
-	})
-}
-
-func TestValueType(t *testing.T) {
-	rt, ctx := setupTestContext(t)
-	defer rt.Close()
-
-	testCases := []struct {
-		name         string
-		code         string
-		value        *qjs.Value
-		expectedType string
-		allowedTypes []string
-	}{
-		{"Symbol", "Symbol('test')", nil, "Symbol", nil},
-		{"NaN", "NaN", nil, "NaN", nil},
-		{"Infinity", "Infinity", nil, "Infinity", nil},
-		{"BigInt", "123n", nil, "BigInt", nil},
-		{"Number", "42", nil, "Number", nil},
-		{"Date", "new Date()", nil, "Date", nil},
-		{"Boolean", "true", nil, "Boolean", nil},
-		{"Null", "null", nil, "Null", nil},
-		{"Undefined", "undefined", nil, "Undefined", nil},
-		{"String", "'hello'", nil, "String", nil},
-		{"Array", "[]", nil, "Array", nil},
-		{"Map", "new Map()", nil, "Map", nil},
-		{"Set", "new Set()", nil, "Set", nil},
-		{"Constructor", "Array", nil, "Constructor", []string{"Constructor Array"}},
-		{"Function", "(() => 42)", nil, "Function", []string{"Constructor"}},
-		{"ArrayBuffer", "new ArrayBuffer(8)", nil, "ArrayBuffer", nil},
-
-		{"IsUninitialized", "", ctx.NewUninitialized(), "Uninitialized", nil},
-		{"Error", "", ctx.NewError(errors.New("some error")), "Error", nil},
-		{"ProxyValue", "", ctx.NewProxyValue(42), "QJSProxyValue", nil},
-
-		{"unknown", "({})", nil, "unknown", nil},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			var val *qjs.Value
-			if tc.value != nil {
-				val = tc.value
-			} else {
-				val = must(ctx.Eval("test.js", qjs.Code(tc.code)))
-			}
-
-			defer val.Free()
-
-			actualType := val.Type()
-			validTypes := append([]string{tc.expectedType}, tc.allowedTypes...)
-			matched := slices.Contains(validTypes, actualType)
-
-			assert.True(t, matched,
-				"Code '%s' expected type in %v but got '%s'",
-				tc.code, validTypes, actualType)
-		})
-	}
-
-	t.Run("PromiseType", func(t *testing.T) {
-		result := must(ctx.Eval("test.js", qjs.Code(`({
-			promise: new Promise((resolve) => resolve(42))
-		})`)))
-		defer result.Free()
-
-		promise := result.GetPropertyStr("promise")
-		defer promise.Resolve()
-		defer promise.Free()
-		assert.Equal(t, "Promise", promise.Type())
 	})
 }
 

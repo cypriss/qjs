@@ -15,6 +15,44 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type CustomInt int
+
+type CustomUint uint
+
+type CustomUint64 uint64
+
+type CustomFloat32 float32
+
+type CustomBool bool
+
+type CustomString string
+
+type CustomIntPtr int
+
+func (c CustomInt) GetValue() int {
+	return int(c)
+}
+
+func (c CustomString) String() string {
+	return string(c)
+}
+
+type AliasInt = int
+
+type AliasString = string
+
+type DefInt int
+
+type DefString string
+
+func (d DefInt) GetValue() int {
+	return int(d)
+}
+
+func (d DefString) Upper() string {
+	return strings.ToUpper(string(d))
+}
+
 // Test data structures for struct conversion tests
 type SimpleStruct struct {
 	Name string
@@ -58,6 +96,29 @@ type StructWithJSONTags struct {
 	CommaOnlyField string `json:","`
 }
 
+type StructWithAliasEmbedded struct {
+	AliasInt
+	AliasString
+	ExtraField string
+}
+
+type StructWithDefEmbedded struct {
+	DefInt
+	DefString
+	ExtraField string
+}
+
+type StructWithEmbeddedPrimitive struct {
+	CustomInt
+	CustomUint
+	CustomUint64
+	CustomFloat32
+	CustomBool
+	CustomString
+	*CustomIntPtr
+	ExtraField string
+}
+
 type EmbeddedStructTest struct {
 	EmbeddedStruct
 	NewField string
@@ -78,58 +139,6 @@ type EmbeddedPointerWithErrorTest struct {
 	ExtraField string
 }
 
-type CustomInt int
-type CustomUint uint
-type CustomUint64 uint64
-type CustomFloat32 float32
-type CustomBool bool
-type CustomString string
-type CustomIntPtr int
-
-func (c CustomInt) GetValue() int {
-	return int(c)
-}
-
-func (c CustomString) String() string {
-	return string(c)
-}
-
-type StructWithEmbeddedPrimitive struct {
-	CustomInt
-	CustomUint
-	CustomUint64
-	CustomFloat32
-	CustomBool
-	CustomString
-	*CustomIntPtr
-	ExtraField string
-}
-
-type AliasInt = int
-type AliasString = string
-type DefInt int
-type DefString string
-
-func (d DefInt) GetValue() int {
-	return int(d)
-}
-
-func (d DefString) Upper() string {
-	return strings.ToUpper(string(d))
-}
-
-type StructWithAliasEmbedded struct {
-	AliasInt
-	AliasString
-	ExtraField string
-}
-
-type StructWithDefEmbedded struct {
-	DefInt
-	DefString
-	ExtraField string
-}
-
 type StructWithInvalidMethod struct {
 	Value int
 }
@@ -143,64 +152,6 @@ type NestedLevel struct {
 	Level int
 	Data  map[string]any
 	Next  *NestedLevel
-}
-
-func createNestedStructure(depth int) any {
-	root := &NestedLevel{
-		Level: 0,
-		Data:  map[string]any{"key0": "value0"},
-	}
-
-	current := root
-	for i := 1; i < depth; i++ {
-		current.Next = &NestedLevel{
-			Level: i,
-			Data:  map[string]any{fmt.Sprintf("key%d", i): fmt.Sprintf("value%d", i)},
-		}
-		current = current.Next
-	}
-
-	return root
-}
-
-func testValueConversion(t *testing.T, ctx *qjs.Context, input any, validator func(*qjs.Value)) {
-	result, err := qjs.ToJSValue(ctx, input)
-	require.NoError(t, err, "ToJSValue should not return error for input %T: %v", input, input)
-	require.NotNil(t, result, "ToJSValue should not return nil for input %T: %v", input, input)
-	defer result.Free()
-	validator(result)
-}
-
-func testErrorCase(t *testing.T, ctx *qjs.Context, input any, expectedErrorSubstring string) {
-	result, err := qjs.ToJSValue(ctx, input)
-	if result != nil {
-		result.Free()
-	}
-	require.Error(t, err, "ToJSValue should return error for input %T: %v", input, input)
-	if expectedErrorSubstring != "" {
-		assert.Contains(t, err.Error(), expectedErrorSubstring)
-	}
-}
-
-func testNumberValue(t *testing.T, ctx *qjs.Context, input any, expected int64) {
-	testValueConversion(t, ctx, input, func(result *qjs.Value) {
-		assert.True(t, result.IsNumber(), "Expected number for input %T: %v", input, input)
-		assert.Equal(t, expected, result.Int64(), "Number value mismatch for input %T: %v", input, input)
-	})
-}
-
-func testFloatValue(t *testing.T, ctx *qjs.Context, input any, expected float64, tolerance float64) {
-	testValueConversion(t, ctx, input, func(result *qjs.Value) {
-		assert.True(t, result.IsNumber(), "Expected number for input %T: %v", input, input)
-		actual := result.Float64()
-		if math.IsNaN(expected) {
-			assert.True(t, math.IsNaN(actual), "Expected NaN for input %T: %v", input, input)
-		} else if math.IsInf(expected, 0) {
-			assert.True(t, math.IsInf(actual, int(math.Copysign(1, expected))), "Expected infinity for input %T: %v", input, input)
-		} else {
-			assert.InDelta(t, expected, actual, tolerance, "Float value mismatch for input %T: %v", input, input)
-		}
-	})
 }
 
 func TestJSValueConversion(t *testing.T) {
@@ -1128,4 +1079,62 @@ func TestToJSValue_ErrorHandling(t *testing.T) {
 		defer jsValue.Free()
 		assert.True(t, jsValue.IsObject())
 	})
+}
+
+func testValueConversion(t *testing.T, ctx *qjs.Context, input any, validator func(*qjs.Value)) {
+	result, err := qjs.ToJSValue(ctx, input)
+	require.NoError(t, err, "ToJSValue should not return error for input %T: %v", input, input)
+	require.NotNil(t, result, "ToJSValue should not return nil for input %T: %v", input, input)
+	defer result.Free()
+	validator(result)
+}
+
+func testErrorCase(t *testing.T, ctx *qjs.Context, input any, expectedErrorSubstring string) {
+	result, err := qjs.ToJSValue(ctx, input)
+	if result != nil {
+		result.Free()
+	}
+	require.Error(t, err, "ToJSValue should return error for input %T: %v", input, input)
+	if expectedErrorSubstring != "" {
+		assert.Contains(t, err.Error(), expectedErrorSubstring)
+	}
+}
+
+func testNumberValue(t *testing.T, ctx *qjs.Context, input any, expected int64) {
+	testValueConversion(t, ctx, input, func(result *qjs.Value) {
+		assert.True(t, result.IsNumber(), "Expected number for input %T: %v", input, input)
+		assert.Equal(t, expected, result.Int64(), "Number value mismatch for input %T: %v", input, input)
+	})
+}
+
+func testFloatValue(t *testing.T, ctx *qjs.Context, input any, expected float64, tolerance float64) {
+	testValueConversion(t, ctx, input, func(result *qjs.Value) {
+		assert.True(t, result.IsNumber(), "Expected number for input %T: %v", input, input)
+		actual := result.Float64()
+		if math.IsNaN(expected) {
+			assert.True(t, math.IsNaN(actual), "Expected NaN for input %T: %v", input, input)
+		} else if math.IsInf(expected, 0) {
+			assert.True(t, math.IsInf(actual, int(math.Copysign(1, expected))), "Expected infinity for input %T: %v", input, input)
+		} else {
+			assert.InDelta(t, expected, actual, tolerance, "Float value mismatch for input %T: %v", input, input)
+		}
+	})
+}
+
+func createNestedStructure(depth int) any {
+	root := &NestedLevel{
+		Level: 0,
+		Data:  map[string]any{"key0": "value0"},
+	}
+
+	current := root
+	for i := 1; i < depth; i++ {
+		current.Next = &NestedLevel{
+			Level: i,
+			Data:  map[string]any{fmt.Sprintf("key%d", i): fmt.Sprintf("value%d", i)},
+		}
+		current = current.Next
+	}
+
+	return root
 }
