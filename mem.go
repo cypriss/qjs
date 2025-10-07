@@ -8,8 +8,8 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-// Mem provides a safe interface for WebAssembly memory operations.
-// It wraps the underlying wazero api.Memory with bounds checking and error handling.
+// Mem provides a safe interface for WebAssembly memory operations. It wraps the underlying
+// wazero api.Memory with bounds checking and error handling.
 type Mem struct {
 	mu  sync.Mutex
 	mem api.Memory
@@ -20,10 +20,10 @@ func (m *Mem) Size() uint32 {
 	return m.mem.Size()
 }
 
-// UnpackPtr extracts address and size from a packed 64-bit value in memory.
-// It reads 8 bytes from the memory address specified by packedPtr, reconstructs
-// the original uint64 value, and then extracts the 32-bit address from the high bits
-// and the 32-bit size from the low bits.
+// UnpackPtr extracts address and size from a packed 64-bit value in memory. It reads 8 bytes
+// from the memory address specified by packedPtr, reconstructs the original uint64 value,
+// and then extracts the 32-bit address from the high bits and the 32-bit size from the low
+// bits.
 //
 // Maintains original signature for backward compatibility - panics on error.
 func (m *Mem) UnpackPtr(packedPtr uint64) (uint32, uint32) {
@@ -52,8 +52,8 @@ func (m *Mem) UnpackPtr(packedPtr uint64) (uint32, uint32) {
 	return addr, size
 }
 
-// Read extracts bytes from WebAssembly memory at the specified address.
-// Performs comprehensive validation and bounds checking.
+// Read extracts bytes from WebAssembly memory at the specified address. Performs comprehensive
+// validation and bounds checking.
 func (m *Mem) Read(addr uint32, size uint64) ([]byte, error) {
 	err := m.validateMemoryAccess(addr, size)
 	if err != nil {
@@ -153,7 +153,8 @@ func (m *Mem) ReadUint64(ptr uint32) (uint64, error) {
 	return v, nil
 }
 
-// ReadFloat64 reads a 64-bit floating point number from WebAssembly memory at the specified address.
+// ReadFloat64 reads a 64-bit floating point number from WebAssembly memory at the specified
+// address.
 func (m *Mem) ReadFloat64(ptr uint32) (float64, error) {
 	uint64Val, err := m.ReadUint64(ptr)
 	if err != nil {
@@ -205,13 +206,14 @@ func (m *Mem) WriteUint64(ptr uint32, v uint64) error {
 	return nil
 }
 
-// WriteFloat64 writes a 64-bit floating point number to WebAssembly memory at the specified address.
+// WriteFloat64 writes a 64-bit floating point number to WebAssembly memory at the specified
+// address.
 func (m *Mem) WriteFloat64(ptr uint32, v float64) error {
 	return m.WriteUint64(ptr, math.Float64bits(v))
 }
 
-// ReadString reads a null-terminated string from WebAssembly memory starting at the given address.
-// It reads up to maxlen bytes and returns the string without the null terminator.
+// ReadString reads a null-terminated string from WebAssembly memory starting at the given
+// address. It reads up to maxlen bytes and returns the string without the null terminator.
 func (m *Mem) ReadString(addr, maxlen uint32) (string, error) {
 	err := m.validatePointer(addr)
 	if err != nil {
@@ -238,8 +240,8 @@ func (m *Mem) ReadString(addr, maxlen uint32) (string, error) {
 	return string(buf[:nullIndex]), nil
 }
 
-// WriteString writes a null-terminated string to WebAssembly memory.
-// It copies the string content to the specified memory address and appends a null terminator.
+// WriteString writes a null-terminated string to WebAssembly memory. It copies the string
+// content to the specified memory address and appends a null terminator.
 func (m *Mem) WriteString(ptr uint32, s string) error {
 	size := uint64(len(s) + 1) // +1 for null terminator
 
@@ -255,8 +257,8 @@ func (m *Mem) WriteString(ptr uint32, s string) error {
 	return nil
 }
 
-// StringFromPackedPtr reads a string from a packed pointer containing address and size.
-// Maintains original signature for backward compatibility - panics on error.
+// StringFromPackedPtr reads a string from a packed pointer containing address and size. Maintains
+// original signature for backward compatibility - panics on error.
 func (m *Mem) StringFromPackedPtr(ptr uint64) string {
 	addr, size := m.UnpackPtr(ptr)
 

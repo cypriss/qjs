@@ -35,11 +35,10 @@ type JSPropertyEnum struct {
 
 const jsPropertyEnumSize = uint32(unsafe.Sizeof(JSPropertyEnum{}))
 
-// Atom represents a JavaScript atom:
-// Object property names and some strings are stored as Atoms (unique strings) to save memory and allow fast comparison.
+// Atom represents a JavaScript atom: Object property names and some strings are stored as
+// Atoms (unique strings) to save memory and allow fast comparison.
 type Atom struct {
 	*Value
-
 	context *Context
 }
 
@@ -480,10 +479,10 @@ func (v *Value) IsPromise() bool {
 	return v.Call("QJS_IsPromise", v.Ctx(), v.Raw()).handle.Bool()
 }
 
-// Resolve resolves a promise with the given arguments.
-// This method is intended for use with Go function bindings (this.Promise() in async Go functions).
-// It will NOT work with native JavaScript promises created via "new Promise()".
-// For native JS promises, use direct function calls or Promise.withResolvers instead.
+// Resolve resolves a promise with the given arguments. This method is intended for use with
+// Go function bindings (this.Promise() in async Go functions). It will NOT work with native
+// JavaScript promises created via "new Promise()". For native JS promises, use direct function
+// calls or Promise.withResolvers instead.
 func (v *Value) Resolve(args ...*Value) error {
 	if v.IsPromise() {
 		result, err := v.InvokeJS("resolve", args...)
@@ -497,10 +496,10 @@ func (v *Value) Resolve(args ...*Value) error {
 	return nil
 }
 
-// Reject rejects a promise with the given arguments.
-// This method is intended for use with Go function bindings (this.Promise() in async Go functions).
-// It will NOT work with native JavaScript promises created via "new Promise()".
-// For native JS promises, use direct function calls or Promise.withResolvers instead.
+// Reject rejects a promise with the given arguments. This method is intended for use with
+// Go function bindings (this.Promise() in async Go functions). It will NOT work with native
+// JavaScript promises created via "new Promise()". For native JS promises, use direct function
+// calls or Promise.withResolvers instead.
 func (v *Value) Reject(args ...*Value) error {
 	if v.IsPromise() {
 		result, err := v.InvokeJS("reject", args...)
@@ -559,7 +558,8 @@ func (v *Value) Object() *Value {
 	return v.Call("JS_ToObject", v.Ctx(), v.Raw())
 }
 
-// ForEach iterates over the properties of the object and calls the given function for each property.
+// ForEach iterates over the properties of the object and calls the given function for each
+// property.
 func (v *Value) ForEach(fn func(key *Value, value *Value)) {
 	if !v.IsObject() {
 		return
@@ -647,8 +647,8 @@ func (v *Value) Bool() bool {
 	return v.Call("JS_ToBool", v.Ctx(), v.Raw()).handle.Bool()
 }
 
-// Int32 returns the int32 value of the value.
-// in c int is 32 bit, but in go it is depends on the architecture.
+// Int32 returns the int32 value of the value. in c int is 32 bit, but in go it is depends
+// on the architecture.
 func (v *Value) Int32() int32 {
 	return v.Call("QJS_ToInt32", v.Ctx(), v.Raw()).handle.Int32()
 }

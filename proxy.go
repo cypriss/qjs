@@ -9,8 +9,8 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-// ProxyRegistry stores Go functions that can be called from JavaScript.
-// It provides thread-safe registration and retrieval of functions with automatic ID generation.
+// ProxyRegistry stores Go functions that can be called from JavaScript. It provides thread-safe
+// registration and retrieval of functions with automatic ID generation.
 type ProxyRegistry struct {
 	nextID  uint64
 	mu      sync.RWMutex
@@ -24,8 +24,8 @@ func NewProxyRegistry() *ProxyRegistry {
 	}
 }
 
-// Register adds a function to the registry and returns its unique ID.
-// This method is thread-safe and can be called concurrently.
+// Register adds a function to the registry and returns its unique ID. This method is thread-safe
+// and can be called concurrently.
 func (r *ProxyRegistry) Register(fn any) uint64 {
 	if fn == nil {
 		return 0
@@ -39,9 +39,8 @@ func (r *ProxyRegistry) Register(fn any) uint64 {
 	return id
 }
 
-// Get retrieves a function by its ID.
-// Returns the function and true if found, nil and false otherwise.
-// This method is thread-safe and can be called concurrently.
+// Get retrieves a function by its ID. Returns the function and true if found, nil and false
+// otherwise. This method is thread-safe and can be called concurrently.
 func (r *ProxyRegistry) Get(id uint64) (any, bool) {
 	if id == 0 {
 		return nil, false
@@ -54,9 +53,8 @@ func (r *ProxyRegistry) Get(id uint64) (any, bool) {
 	return fn, ok
 }
 
-// Unregister removes a function from the registry by its ID.
-// Returns true if the function was found and removed, false otherwise.
-// This method is thread-safe and can be called concurrently.
+// Unregister removes a function from the registry by its ID. Returns true if the function
+// was found and removed, false otherwise. This method is thread-safe and can be called concurrently.
 func (r *ProxyRegistry) Unregister(id uint64) bool {
 	if id == 0 {
 		return false
@@ -74,8 +72,7 @@ func (r *ProxyRegistry) Unregister(id uint64) bool {
 	return exists
 }
 
-// Len returns the number of registered functions.
-// This method is thread-safe.
+// Len returns the number of registered functions. This method is thread-safe.
 func (r *ProxyRegistry) Len() int {
 	r.mu.RLock()
 	count := len(r.proxies)
@@ -84,25 +81,24 @@ func (r *ProxyRegistry) Len() int {
 	return count
 }
 
-// Clear removes all registered functions from the registry.
-// This method is thread-safe.
+// Clear removes all registered functions from the registry. This method is thread-safe.
 func (r *ProxyRegistry) Clear() {
 	r.mu.Lock()
 	r.proxies = make(map[uint64]any)
 	r.mu.Unlock()
 }
 
-// JsFunctionProxy is the Go host function that will be imported by the WASM module.
-// It corresponds to the following C declaration:
+// JsFunctionProxy is the Go host function that will be imported by the WASM module. It corresponds
+// to the following C declaration:
 //
 //	__attribute__((import_module("env"), import_name("jsFunctionProxy")))
 //	extern JSValue jsFunctionProxy(JSContext *ctx, JSValueConst this, int argc, JSValueConst *argv);
 //
 // Parameters:
-//   - ctx: 	JSContext pointer
-//   - this: 	JSValueConst this (the "this" value)
-//   - argc: 	int argc (number of arguments)
-//   - argv: 	pointer to argv (an array of JSValueConst/JSValue, each 8 bytes - uint64)
+//   - ctx: JSContext pointer
+//   - this: JSValueConst this (the "this" value)
+//   - argc: int argc (number of arguments)
+//   - argv: pointer to argv (an array of JSValueConst/JSValue, each 8 bytes - uint64)
 type JsFunctionProxy = func(
 	ctx context.Context,
 	module api.Module,
@@ -112,8 +108,9 @@ type JsFunctionProxy = func(
 	argv uint32,
 ) (rs uint64)
 
-// createFuncProxyWithRegistry creates a WASM function proxy that bridges JavaScript function calls to Go functions.
-// It handles parameter extraction, error recovery, and result conversion between JS and Go.
+// createFuncProxyWithRegistry creates a WASM function proxy that bridges JavaScript function
+// calls to Go functions. It handles parameter extraction, error recovery, and result conversion
+// between JS and Go.
 func createFuncProxyWithRegistry(registry *ProxyRegistry) JsFunctionProxy {
 	return func(
 		_ context.Context,
@@ -167,8 +164,8 @@ func validateAndReturnResult(this *This, result *Value) uint64 {
 	return result.Raw()
 }
 
-// getProxyFuncParams extracts and validates parameters for proxy function calls.
-// It parses WASM memory to extract function ID, context, arguments, and async information.
+// getProxyFuncParams extracts and validates parameters for proxy function calls. It parses
+// WASM memory to extract function ID, context, arguments, and async information.
 func getProxyFuncParams(
 	registry *ProxyRegistry,
 	mem api.Memory,
@@ -242,8 +239,8 @@ func retrieveGoResources(
 	return goFunc, goContext
 }
 
-// readArgsFromWasmMem reads the argument array from WASM memory with proper validation.
-// Each argument is 8 bytes (uint64) in little-endian format.
+// readArgsFromWasmMem reads the argument array from WASM memory with proper validation. Each
+// argument is 8 bytes (uint64) in little-endian format.
 func readArgsFromWasmMem(mem api.Memory, argc uint32, argv uint32) []uint64 {
 	args := make([]uint64, argc)
 

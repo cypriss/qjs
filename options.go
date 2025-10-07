@@ -10,22 +10,26 @@ import (
 const (
 	// JsEvalTypeGlobal evaluates code in global scope (default).
 	JsEvalTypeGlobal = (0 << 0)
+
 	// JsEvalTypeModule evaluates code as ES6 module.
 	JsEvalTypeModule = (1 << 0)
+
 	// JsEvalTypeDirect performs direct call (internal use).
 	JsEvalTypeDirect = (2 << 0)
+
 	// JsEvalTypeInDirect performs indirect call (internal use).
 	JsEvalTypeInDirect = (3 << 0)
-	// JsEvalTypeMask masks the eval type bits.
-	JsEvalTypeMask = (3 << 0)
-	// JsEvalFlagStrict forces strict mode execution.
-	JsEvalFlagStrict = (1 << 3)
-	// JsEvalFlagUnUsed is reserved for future use.
-	JsEvalFlagUnUsed = (1 << 4)
+
+	JsEvalTypeMask   = (3 << 0) // JsEvalTypeMask masks the eval type bits.
+	JsEvalFlagStrict = (1 << 3) // JsEvalFlagStrict forces strict mode execution.
+	JsEvalFlagUnUsed = (1 << 4) // JsEvalFlagUnUsed is reserved for future use.
+
 	// JsEvalFlagCompileOnly returns a JS bytecode/module for JS_EvalFunction().
 	JsEvalFlagCompileOnly = (1 << 5)
+
 	// JsEvalFlagBackTraceBarrier prevents the stack frames before this eval in the Error() backtraces.
 	JsEvalFlagBackTraceBarrier = (1 << 6)
+
 	// JsEvalFlagAsync enables top-level await (global scope only).
 	JsEvalFlagAsync = (1 << 7)
 )
@@ -34,31 +38,31 @@ type Option struct {
 	CWD               string
 	StartFunctionName string
 	Context           context.Context
-	// Enabling this option significantly increases evaluation time
-	// because every operation must check the done context, which introduces additional overhead.
+
+	// Enabling this option significantly increases evaluation time because every operation must
+	// check the done context, which introduces additional overhead.
 	CloseOnContextDone bool
-	DisableBuildCache  bool
-	MemoryLimit        int
-	MaxStackSize       int
-	MaxExecutionTime   int
-	GCThreshold        int
-	QuickJSWasmBytes   []byte
-	ProxyFunction      any
-	Stdout             io.Writer
-	Stderr             io.Writer
+
+	DisableBuildCache bool
+	MemoryLimit       int
+	MaxStackSize      int
+	MaxExecutionTime  int
+	GCThreshold       int
+	QuickJSWasmBytes  []byte
+	ProxyFunction     any
+	Stdout            io.Writer
+	Stderr            io.Writer
 }
 
 // EvalOption configures JavaScript evaluation behavior in QuickJS context.
 type EvalOption struct {
-	c           *Context
-	file        string
-	code        string
-	bytecode    []byte
-	bytecodeLen int
-	flags       uint64
-
-	// QuickJS value handles for memory management
-	fileValue     *Value
+	c             *Context
+	file          string
+	code          string
+	bytecode      []byte
+	bytecodeLen   int
+	flags         uint64
+	fileValue     *Value // QuickJS value handles for memory management
 	codeValue     *Value
 	byteCodeValue *Value
 }
@@ -110,8 +114,8 @@ func TypeModule() EvalOptionFunc {
 	}
 }
 
-// FlagAsync enables top-level await in global scripts.
-// Returns a promise from JS_Eval(). Only valid with TypeGlobal.
+// FlagAsync enables top-level await in global scripts. Returns a promise from JS_Eval(). Only
+// valid with TypeGlobal.
 func FlagAsync() EvalOptionFunc {
 	return func(o *EvalOption) {
 		o.flags |= JsEvalFlagAsync
@@ -125,8 +129,8 @@ func FlagStrict() EvalOptionFunc {
 	}
 }
 
-// FlagCompileOnly compiles code without execution.
-// Returns bytecode object for later execution with JS_EvalFunction().
+// FlagCompileOnly compiles code without execution. Returns bytecode object for later execution
+// with JS_EvalFunction().
 func FlagCompileOnly() EvalOptionFunc {
 	return func(o *EvalOption) {
 		o.flags |= JsEvalFlagCompileOnly
@@ -197,8 +201,8 @@ func (o *EvalOption) Handle() (handle uint64) {
 	return option.Raw()
 }
 
-// Free releases QuickJS value handles to prevent memory leaks.
-// Must be called after Handle() to clean up WASM memory.
+// Free releases QuickJS value handles to prevent memory leaks. Must be called after Handle()
+// to clean up WASM memory.
 func (o *EvalOption) Free() {
 	if o.fileValue.Raw() != 0 {
 		o.c.Call("JS_FreeValue", o.c.Raw(), o.fileValue.Raw())

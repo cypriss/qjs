@@ -192,8 +192,8 @@ func JsArgToGo(jsArg *Value, argType reflect.Type) (reflect.Value, error) {
 	return reflect.ValueOf(goVal), nil
 }
 
-// CreateVariadicSlice creates a reflect.Value slice for variadic arguments.
-// Converts remaining JS arguments to the slice element type and returns as a slice value.
+// CreateVariadicSlice creates a reflect.Value slice for variadic arguments. Converts remaining
+// JS arguments to the slice element type and returns as a slice value.
 func CreateVariadicSlice(jsArgs []*Value, sliceType reflect.Type, fixedArgsCount int) (reflect.Value, error) {
 	varArgType := sliceType.Elem()
 	numVarArgs := len(jsArgs)
@@ -211,9 +211,9 @@ func CreateVariadicSlice(jsArgs []*Value, sliceType reflect.Type, fixedArgsCount
 	return variadicSlice, nil
 }
 
-// GoFuncResultToJs processes Go function call results and converts them to JS values.
-// If last return value is a non-nil error, it's thrown in JS context.
-// The remaining return values are converted to JS value or JS array if there are multiple.
+// GoFuncResultToJs processes Go function call results and converts them to JS values. If last
+// return value is a non-nil error, it's thrown in JS context. The remaining return values
+// are converted to JS value or JS array if there are multiple.
 func GoFuncResultToJs(c *Context, results []reflect.Value) (*Value, error) {
 	if len(results) == 0 {
 		return nil, nil
