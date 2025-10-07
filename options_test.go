@@ -12,11 +12,11 @@ import (
 
 func TestEvalOptions(t *testing.T) {
 	t.Run("DefaultOptions", func(t *testing.T) {
-		runtime := must(qjs.New())
-		defer runtime.Close()
+		rt := must(qjs.New())
+		defer rt.Close()
 
 		// Use Eval to test the default options (should be global with strict mode)
-		val, err := runtime.Eval("test.js", qjs.Code("'use strict'; 'test'"))
+		val, err := rt.Eval("test.js", qjs.Code("'use strict'; 'test'"))
 		assert.NoError(t, err)
 		assert.Equal(t, "test", val.String())
 		val.Free()
@@ -71,20 +71,20 @@ func TestEvalOptions(t *testing.T) {
 	})
 
 	t.Run("CodeOption", func(t *testing.T) {
-		runtime := must(qjs.New())
-		defer runtime.Close()
+		rt := must(qjs.New())
+		defer rt.Close()
 
-		val, err := runtime.Eval("test.js", qjs.Code("42"))
+		val, err := rt.Eval("test.js", qjs.Code("42"))
 		assert.NoError(t, err)
 		assert.Equal(t, int32(42), val.Int32())
 		val.Free()
 	})
 
 	t.Run("TypeModuleOption", func(t *testing.T) {
-		runtime := must(qjs.New())
-		defer runtime.Close()
+		rt := must(qjs.New())
+		defer rt.Close()
 
-		val, err := runtime.Eval("test.js",
+		val, err := rt.Eval("test.js",
 			qjs.Code("export default 'module'"),
 			qjs.TypeModule())
 		assert.NoError(t, err)
@@ -93,31 +93,31 @@ func TestEvalOptions(t *testing.T) {
 	})
 
 	t.Run("BytecodeCompileAndEval", func(t *testing.T) {
-		runtime := must(qjs.New())
-		defer runtime.Close()
+		rt := must(qjs.New())
+		defer rt.Close()
 
-		bytecode, err := runtime.Compile("test.js", qjs.Code("123 + 456"))
+		bytecode, err := rt.Compile("test.js", qjs.Code("123 + 456"))
 		assert.NoError(t, err)
 		assert.NotEmpty(t, bytecode)
 
-		val, err := runtime.Eval("test.js", qjs.Bytecode(bytecode))
+		val, err := rt.Eval("test.js", qjs.Bytecode(bytecode))
 		assert.NoError(t, err)
 		assert.Equal(t, int32(579), val.Int32())
 		val.Free()
 	})
 
 	t.Run("ModuleBytecodeCompileAndEval", func(t *testing.T) {
-		runtime := must(qjs.New())
-		defer runtime.Close()
+		rt := must(qjs.New())
+		defer rt.Close()
 
-		bytecode, err := runtime.Compile(
+		bytecode, err := rt.Compile(
 			"test.js",
 			qjs.Code("export default 'module bytecode'"),
 			qjs.TypeModule())
 		assert.NoError(t, err)
 		assert.NotEmpty(t, bytecode)
 
-		val, err := runtime.Eval("test.js",
+		val, err := rt.Eval("test.js",
 			qjs.Bytecode(bytecode),
 			qjs.TypeModule())
 		assert.NoError(t, err)
@@ -126,11 +126,11 @@ func TestEvalOptions(t *testing.T) {
 	})
 
 	t.Run("FlagAsyncOption", func(t *testing.T) {
-		runtime := must(qjs.New())
-		defer runtime.Close()
+		rt := must(qjs.New())
+		defer rt.Close()
 
 		// Test async flag with top-level await
-		val, err := runtime.Eval("test.js",
+		val, err := rt.Eval("test.js",
 			qjs.Code("await Promise.resolve(100)"),
 			qjs.FlagAsync())
 		assert.NoError(t, err)
@@ -139,11 +139,11 @@ func TestEvalOptions(t *testing.T) {
 	})
 
 	t.Run("FlagStrictOption", func(t *testing.T) {
-		runtime := must(qjs.New())
-		defer runtime.Close()
+		rt := must(qjs.New())
+		defer rt.Close()
 
 		// In strict mode, using undeclared variables throws an error
-		_, err := runtime.Eval("test.js",
+		_, err := rt.Eval("test.js",
 			qjs.Code("undeclaredVar = 10"),
 			qjs.FlagStrict())
 		assert.Error(t, err)
@@ -151,9 +151,9 @@ func TestEvalOptions(t *testing.T) {
 	})
 
 	t.Run("FlagCompileOnlyOption", func(t *testing.T) {
-		runtime := must(qjs.New())
-		defer runtime.Close()
-		ctx := runtime.Context()
+		rt := must(qjs.New())
+		defer rt.Close()
+		ctx := rt.Context()
 
 		// We need to use Go API directly because runtime.Compile
 		// already applies FlagCompileOnly
@@ -168,31 +168,31 @@ func TestEvalOptions(t *testing.T) {
 	})
 
 	t.Run("FlagBacktraceBarrierOption", func(t *testing.T) {
-		runtime := must(qjs.New())
-		defer runtime.Close()
+		rt := must(qjs.New())
+		defer rt.Close()
 
-		_, err := runtime.Eval("outer.js", qjs.Code(`
+		_, err := rt.Eval("outer.js", qjs.Code(`
             function outer() {
                 throw new Error("test error");
             }
         `))
 		assert.NoError(t, err)
 
-		_, err = runtime.Eval("without-barrier.js", qjs.Code(`outer()`))
+		_, err = rt.Eval("without-barrier.js", qjs.Code(`outer()`))
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "outer.js")
 
-		_, err = runtime.Eval("with-barrier.js",
+		_, err = rt.Eval("with-barrier.js",
 			qjs.Code(`outer()`),
 			qjs.FlagBacktraceBarrier())
 		assert.Error(t, err)
 	})
 
 	t.Run("MultipleOptions", func(t *testing.T) {
-		runtime := must(qjs.New())
-		defer runtime.Close()
+		rt := must(qjs.New())
+		defer rt.Close()
 
-		val, err := runtime.Eval("test.js",
+		val, err := rt.Eval("test.js",
 			qjs.Code("export default await Promise.resolve('async module')"),
 			qjs.TypeModule(),
 			qjs.FlagStrict())
@@ -202,10 +202,10 @@ func TestEvalOptions(t *testing.T) {
 	})
 
 	t.Run("ExplicitTypeGlobal", func(t *testing.T) {
-		runtime := must(qjs.New())
-		defer runtime.Close()
+		rt := must(qjs.New())
+		defer rt.Close()
 
-		val, err := runtime.Eval("test.js",
+		val, err := rt.Eval("test.js",
 			qjs.Code("var x = 100; x;"),
 			qjs.TypeGlobal())
 		assert.NoError(t, err)
@@ -214,17 +214,17 @@ func TestEvalOptions(t *testing.T) {
 	})
 
 	t.Run("BytecodeWithModuleAndAsync", func(t *testing.T) {
-		runtime := must(qjs.New())
-		defer runtime.Close()
+		rt := must(qjs.New())
+		defer rt.Close()
 
-		bytecode, err := runtime.Compile(
+		bytecode, err := rt.Compile(
 			"test.js",
 			qjs.Code("export default await Promise.resolve(42)"),
 			qjs.TypeModule())
 		assert.NoError(t, err)
 		assert.NotEmpty(t, bytecode)
 
-		val, err := runtime.Eval("test.js",
+		val, err := rt.Eval("test.js",
 			qjs.Bytecode(bytecode),
 			qjs.TypeModule())
 		assert.NoError(t, err)
@@ -233,10 +233,10 @@ func TestEvalOptions(t *testing.T) {
 	})
 
 	t.Run("ModuleWithStrictMode", func(t *testing.T) {
-		runtime := must(qjs.New())
-		defer runtime.Close()
+		rt := must(qjs.New())
+		defer rt.Close()
 
-		val, err := runtime.Eval("test.js",
+		val, err := rt.Eval("test.js",
 			qjs.Code("export default 'strict module'"),
 			qjs.TypeModule(),
 			qjs.FlagStrict())
@@ -244,7 +244,7 @@ func TestEvalOptions(t *testing.T) {
 		assert.Equal(t, "strict module", val.String())
 		val.Free()
 
-		_, err = runtime.Eval("test.js",
+		_, err = rt.Eval("test.js",
 			qjs.Code("export default (function() { with({}) { return 'test'; } })()"),
 			qjs.TypeModule(),
 			qjs.FlagStrict())
@@ -254,25 +254,25 @@ func TestEvalOptions(t *testing.T) {
 }
 
 func TestInternalOptions(t *testing.T) {
-	runtime := must(qjs.New())
-	defer runtime.Close()
+	rt := must(qjs.New())
+	defer rt.Close()
 
-	_, err := runtime.Compile("test.js",
+	_, err := rt.Compile("test.js",
 		qjs.Code("42"),
 		qjs.TypeDirect())
 	assert.NoError(t, err)
 
-	_, err = runtime.Compile("test.js",
+	_, err = rt.Compile("test.js",
 		qjs.Code("42"),
 		qjs.TypeIndirect())
 	assert.NoError(t, err)
 
-	_, err = runtime.Compile("test.js",
+	_, err = rt.Compile("test.js",
 		qjs.Code("42"),
 		qjs.TypeMask())
 	assert.NoError(t, err)
 
-	_, err = runtime.Compile("test.js",
+	_, err = rt.Compile("test.js",
 		qjs.Code("42"),
 		qjs.FlagUnused())
 	assert.NoError(t, err)

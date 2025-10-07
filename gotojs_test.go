@@ -204,9 +204,9 @@ func testFloatValue(t *testing.T, ctx *qjs.Context, input any, expected float64,
 }
 
 func TestJSValueConversion(t *testing.T) {
-	runtime := must(qjs.New())
-	defer runtime.Close()
-	ctx := runtime.Context()
+	rt := must(qjs.New())
+	defer rt.Close()
+	ctx := rt.Context()
 
 	t.Run("NumericTypes", func(t *testing.T) {
 		t.Run("SignedIntegers", func(t *testing.T) {
@@ -245,12 +245,12 @@ func TestJSValueConversion(t *testing.T) {
 			}
 
 			t.Run("ByteRuneComplexTypes", func(t *testing.T) {
-				jsValue, err := qjs.ToJSValue(runtime.Context(), []byte("hello world"))
+				val, err := qjs.ToJSValue(rt.Context(), []byte("hello world"))
 				require.NoError(t, err)
-				defer jsValue.Free()
+				defer val.Free()
 
-				assert.NotNil(t, jsValue)
-				assert.True(t, jsValue.IsByteArray())
+				assert.NotNil(t, val)
+				assert.True(t, val.IsByteArray())
 			})
 
 			// Special handling for int32 (uses Int32() method)
@@ -1039,9 +1039,9 @@ func TestJSValueConversion(t *testing.T) {
 
 // Additional specific error path tests
 func TestToJSValue_ErrorHandling(t *testing.T) {
-	runtime := must(qjs.New())
-	defer runtime.Close()
-	ctx := runtime.Context()
+	rt := must(qjs.New())
+	defer rt.Close()
+	ctx := rt.Context()
 
 	t.Run("ErrorValues", func(t *testing.T) {
 		t.Run("StandardError", func(t *testing.T) {
@@ -1123,9 +1123,9 @@ func TestToJSValue_ErrorHandling(t *testing.T) {
 		const maxDepth = 10
 		root := createNestedStructure(maxDepth)
 
-		jsValue, err := qjs.ToJSValue(runtime.Context(), root)
+		val, err := qjs.ToJSValue(rt.Context(), root)
 		require.NoError(t, err)
-		defer jsValue.Free()
-		assert.True(t, jsValue.IsObject())
+		defer val.Free()
+		assert.True(t, val.IsObject())
 	})
 }

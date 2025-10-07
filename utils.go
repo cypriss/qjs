@@ -20,37 +20,37 @@ func IsImplementError(rtype reflect.Type) bool {
 }
 
 // IsImplementsJSONUnmarshaler checks if a type implements json.Unmarshaler.
-func IsImplementsJSONUnmarshaler(t reflect.Type) bool {
+func IsImplementsJSONUnmarshaler(rtype reflect.Type) bool {
 	unmarshalerType := reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
 
-	return t.Implements(unmarshalerType) || reflect.PointerTo(t).Implements(unmarshalerType)
+	return rtype.Implements(unmarshalerType) || reflect.PointerTo(rtype).Implements(unmarshalerType)
 }
 
 // GetGoTypeName creates a descriptive string for complex types.
 func GetGoTypeName(input any) string {
-	var t reflect.Type
+	var targetType reflect.Type
 	switch v := input.(type) {
 	case reflect.Type:
-		t = v
+		targetType = v
 	default:
-		t = reflect.TypeOf(v)
+		targetType = reflect.TypeOf(v)
 	}
 
-	switch t.Kind() {
+	switch targetType.Kind() {
 	case reflect.Ptr:
-		return "*" + GetGoTypeName(t.Elem())
+		return "*" + GetGoTypeName(targetType.Elem())
 	case reflect.Slice:
-		return "[]" + GetGoTypeName(t.Elem())
+		return "[]" + GetGoTypeName(targetType.Elem())
 	case reflect.Array:
-		return fmt.Sprintf("[%d]%s", t.Len(), GetGoTypeName(t.Elem()))
+		return fmt.Sprintf("[%d]%s", targetType.Len(), GetGoTypeName(targetType.Elem()))
 	case reflect.Map:
-		return fmt.Sprintf("map[%s]%s", GetGoTypeName(t.Key()), GetGoTypeName(t.Elem()))
+		return fmt.Sprintf("map[%s]%s", GetGoTypeName(targetType.Key()), GetGoTypeName(targetType.Elem()))
 	case reflect.Chan:
-		return "chan " + GetGoTypeName(t.Elem())
+		return "chan " + GetGoTypeName(targetType.Elem())
 	case reflect.Func:
-		return CreateGoFuncSignature(t)
+		return CreateGoFuncSignature(targetType)
 	default:
-		return t.String()
+		return targetType.String()
 	}
 }
 
@@ -92,18 +92,18 @@ func CreateGoFuncSignature(fnType reflect.Type) string {
 }
 
 // IsConvertibleToJs checks if a Go type can be converted to a JavaScript type.
-func IsConvertibleToJs(rType reflect.Type, visited map[reflect.Type]bool, detail string) (err error) {
+func IsConvertibleToJs(rtype reflect.Type, visited map[reflect.Type]bool, detail string) (err error) {
 	// Prevent infinite recursion for recursive types
-	if visited[rType] {
+	if visited[rtype] {
 		return nil
 	}
 
-	visited[rType] = true
-	if rType.Kind() == reflect.Ptr {
-		return IsConvertibleToJs(rType.Elem(), visited, detail)
+	visited[rtype] = true
+	if rtype.Kind() == reflect.Ptr {
+		return IsConvertibleToJs(rtype.Elem(), visited, detail)
 	}
 
-	switch rType.Kind() {
+	switch rtype.Kind() {
 	case reflect.Chan:
 		return nil
 	case reflect.UnsafePointer:
@@ -111,36 +111,36 @@ func IsConvertibleToJs(rType reflect.Type, visited map[reflect.Type]bool, detail
 	case reflect.Func:
 		return nil
 	case reflect.Slice:
-		err := IsConvertibleToJs(rType.Elem(), visited, detail)
+		err := IsConvertibleToJs(rtype.Elem(), visited, detail)
 		if err != nil {
-			return newGoToJsErr("slice: "+GetGoTypeName(rType.Elem()), nil, detail)
+			return newGoToJsErr("slice: "+GetGoTypeName(rtype.Elem()), nil, detail)
 		}
 
 		return nil
 	case reflect.Array:
-		err := IsConvertibleToJs(rType.Elem(), visited, detail)
+		err := IsConvertibleToJs(rtype.Elem(), visited, detail)
 		if err != nil {
-			return newGoToJsErr("array: "+GetGoTypeName(rType.Elem()), nil, detail)
+			return newGoToJsErr("array: "+GetGoTypeName(rtype.Elem()), nil, detail)
 		}
 
 		return nil
 	case reflect.Map:
-		keyType := rType.Key()
+		keyType := rtype.Key()
 
 		err := IsConvertibleToJs(keyType, visited, detail)
 		if err != nil {
 			return newGoToJsErr("map key: "+GetGoTypeName(keyType), nil, detail)
 		}
 
-		valueType := rType.Elem()
+		valueType := rtype.Elem()
 		if err := IsConvertibleToJs(valueType, visited, detail); err != nil {
 			return newGoToJsErr("map value: "+GetGoTypeName(valueType), nil, detail)
 		}
 
 		return nil
 	case reflect.Struct:
-		for i := range rType.NumField() {
-			field := rType.Field(i)
+		for i := range rtype.NumField() {
+			field := rtype.Field(i)
 			jsonTagName, _, _ := strings.Cut(field.Tag.Get("json"), ",")
 
 			if !field.IsExported() || jsonTagName == "-" {
@@ -148,7 +148,7 @@ func IsConvertibleToJs(rType reflect.Type, visited map[reflect.Type]bool, detail
 			}
 
 			if err := IsConvertibleToJs(field.Type, visited, detail); err != nil {
-				return newGoToJsErr(GetGoTypeName(rType)+"."+field.Name, err)
+				return newGoToJsErr(GetGoTypeName(rtype)+"."+field.Name, err)
 			}
 		}
 
@@ -161,12 +161,12 @@ func IsConvertibleToJs(rType reflect.Type, visited map[reflect.Type]bool, detail
 }
 
 // IsNumericType checks if a reflect.Type represents a numeric type.
-func IsNumericType(t reflect.Type) bool {
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
+func IsNumericType(rtype reflect.Type) bool {
+	if rtype.Kind() == reflect.Ptr {
+		rtype = rtype.Elem()
 	}
 
-	switch t.Kind() {
+	switch rtype.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
 		reflect.Float32, reflect.Float64,

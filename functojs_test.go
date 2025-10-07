@@ -165,12 +165,12 @@ func TestParameters(t *testing.T) {
 	})
 
 	t.Run("InvalidParameterTypes", func(t *testing.T) {
-		goFunc, err := qjs.FuncToJS(ctx, func(x int, y ...int) int {
+		jsFunc, err := qjs.FuncToJS(ctx, func(x int, y ...int) int {
 			return len(y) + 1
 		})
 		assert.NoError(t, err)
-		defer goFunc.Free()
-		ctx.Global().SetPropertyStr("testFunc", goFunc)
+		defer jsFunc.Free()
+		ctx.Global().SetPropertyStr("testFunc", jsFunc)
 		_, err = ctx.Eval("test.js", qjs.Code(`testFunc("invalid", 2)`))
 		require.Error(t, err)
 	})

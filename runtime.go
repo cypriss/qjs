@@ -76,11 +76,11 @@ func createGlobalCompiledModule(
 }
 
 // New creates a QuickJS runtime with optional configuration.
-func New(options ...*Option) (runtime *Runtime, err error) {
+func New(options ...*Option) (rt *Runtime, err error) {
 	defer func() {
 		rerr := AnyToError(recover())
 		if rerr != nil {
-			runtime = nil
+			rt = nil
 			err = fmt.Errorf("failed to create QJS runtime: %w", rerr)
 		}
 	}()
@@ -101,22 +101,22 @@ func New(options ...*Option) (runtime *Runtime, err error) {
 		return nil, fmt.Errorf("failed to create global compiled module: %w", err)
 	}
 
-	runtime = &Runtime{
+	rt = &Runtime{
 		option:   option,
 		context:  &Context{Context: option.Context},
 		registry: proxyRegistry,
 	}
 
-	runtime.wrt = wazero.NewRuntimeWithConfig(
+	rt.wrt = wazero.NewRuntimeWithConfig(
 		option.Context,
 		cachedRuntimeConfig,
 	)
 
-	if _, err := wsp1.Instantiate(option.Context, runtime.wrt); err != nil {
+	if _, err := wsp1.Instantiate(option.Context, rt.wrt); err != nil {
 		return nil, fmt.Errorf("failed to instantiate WASI: %w", err)
 	}
 
-	if _, err := runtime.wrt.NewHostModuleBuilder("env").
+	if _, err := rt.wrt.NewHostModuleBuilder("env").
 		NewFunctionBuilder().
 		WithFunc(option.ProxyFunction).
 		Export("jsFunctionProxy").
@@ -126,8 +126,8 @@ func New(options ...*Option) (runtime *Runtime, err error) {
 
 	fsConfig := wazero.
 		NewFSConfig().
-		WithDirMount(runtime.option.CWD, "/")
-	if runtime.module, err = runtime.wrt.InstantiateModule(
+		WithDirMount(rt.option.CWD, "/")
+	if rt.module, err = rt.wrt.InstantiateModule(
 		option.Context,
 		compiledQJSModule,
 		wazero.NewModuleConfig().
@@ -142,9 +142,9 @@ func New(options ...*Option) (runtime *Runtime, err error) {
 		return nil, fmt.Errorf("failed to instantiate module: %w", err)
 	}
 
-	runtime.initializeRuntime()
+	rt.initializeRuntime()
 
-	return runtime, nil
+	return rt, nil
 }
 
 // FreeQJSRuntime frees the QJS runtime.

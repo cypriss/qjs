@@ -26,15 +26,15 @@ func (m *Mem) Size() uint32 {
 // bits.
 //
 // Maintains original signature for backward compatibility - panics on error.
-func (m *Mem) UnpackPtr(packedPtr uint64) (uint32, uint32) {
-	if packedPtr == 0 {
+func (m *Mem) UnpackPtr(ptr uint64) (uint32, uint32) {
+	if ptr == 0 {
 		return 0, 0
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	packedBytes, err := m.Read(uint32(packedPtr), PackedPtrSize)
+	buf, err := m.Read(uint32(ptr), PackedPtrSize)
 	if err != nil {
 		panic(err)
 	}
@@ -42,7 +42,7 @@ func (m *Mem) UnpackPtr(packedPtr uint64) (uint32, uint32) {
 	// Reconstruct the packed value from little-endian bytes
 	packed := uint64(0)
 	for i := range PackedPtrSize {
-		packed |= uint64(packedBytes[i]) << (i * 8)
+		packed |= uint64(buf[i]) << (i * 8)
 	}
 
 	// Extract address (high 32 bits) and size (low 32 bits)

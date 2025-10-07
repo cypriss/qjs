@@ -152,16 +152,16 @@ func handlePanicRecovery(this *This, r any) uint64 {
 }
 
 // validateAndReturnResult validates the function result and handles JavaScript exceptions.
-func validateAndReturnResult(this *This, result *Value) uint64 {
+func validateAndReturnResult(this *This, input *Value) uint64 {
 	if this.context.HasException() {
 		panic(this.context.Exception())
 	}
 
-	if result == nil {
+	if input == nil {
 		return this.context.NewUndefined().Raw()
 	}
 
-	return result.Raw()
+	return input.Raw()
 }
 
 // getProxyFuncParams extracts and validates parameters for proxy function calls. It parses
@@ -188,22 +188,22 @@ func getProxyFuncParams(
 }
 
 // extractPromiseIfAsync extracts the promise handle for async functions.
-func extractPromiseIfAsync(context *Context, args []uint64, isAsync uint64) *Value {
+func extractPromiseIfAsync(c *Context, args []uint64, isAsync uint64) *Value {
 	if isAsync == 0 {
-		return context.NewUndefined()
+		return c.NewUndefined()
 	}
 
 	promiseHandle := args[3]
 
-	return context.NewValue(NewHandle(context.runtime, promiseHandle))
+	return c.NewValue(NewHandle(c.runtime, promiseHandle))
 }
 
 // extractFunctionArguments extracts and clones function arguments from WASM memory.
-func extractFunctionArguments(context *Context, args []uint64) []*Value {
+func extractFunctionArguments(c *Context, args []uint64) []*Value {
 	fnArgs := make([]*Value, len(args)-4)
 	for i := range fnArgs {
 		argHandle := args[4+i]
-		arg := context.NewValue(NewHandle(context.runtime, argHandle))
+		arg := c.NewValue(NewHandle(c.runtime, argHandle))
 		fnArgs[i] = arg.Clone()
 	}
 
@@ -211,10 +211,10 @@ func extractFunctionArguments(context *Context, args []uint64) []*Value {
 }
 
 // createThisContext creates the This context for function execution.
-func createThisContext(context *Context, thisRef uint64, args []*Value, promise *Value, isAsync uint64) *This {
-	thisValue := context.NewValue(NewHandle(context.runtime, thisRef))
+func createThisContext(c *Context, thisRef uint64, args []*Value, promise *Value, isAsync uint64) *This {
+	thisValue := c.NewValue(NewHandle(c.runtime, thisRef))
 	this := &This{
-		context: context,
+		context: c,
 		Value:   thisValue,
 		args:    args,
 		promise: promise,

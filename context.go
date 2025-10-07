@@ -123,10 +123,10 @@ func (c *Context) SetAsyncFunc(name string, fn AsyncFunction) {
 
 // ParseJSON parses given JSON string and returns an object value.
 func (c *Context) ParseJSON(v string) *Value {
-	cStr := c.NewStringHandle(v)
-	defer cStr.Free()
+	str := c.NewStringHandle(v)
+	defer str.Free()
 
-	return c.Call("QJS_ParseJSON", c.Raw(), cStr.Raw())
+	return c.Call("QJS_ParseJSON", c.Raw(), str.Raw())
 }
 
 // NewValue creates a new Value wrapper around the given handle.
@@ -237,11 +237,11 @@ func (c *Context) NewSet() *Set {
 
 // NewAtom creates a new Atom from the given string.
 func (c *Context) NewAtom(v string) Atom {
-	cstr := c.NewStringHandle(v)
+	str := c.NewStringHandle(v)
 
-	atomValue := c.Call("JS_NewAtom", c.Raw(), cstr.Raw())
+	atomValue := c.Call("JS_NewAtom", c.Raw(), str.Raw())
 
-	defer cstr.Free()
+	defer str.Free()
 
 	return Atom{context: c, Value: atomValue}
 }

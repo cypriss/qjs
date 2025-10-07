@@ -35,26 +35,26 @@ func createThrowingFunction(ctx *qjs.Context, errorMsg string) *qjs.Value {
 
 // setupMapWithFailingMethod creates a map with a method that throws an error
 func setupMapWithFailingMethod(ctx *qjs.Context, methodName, errorMsg string) *qjs.Map {
-	result := ctx.NewMap()
+	m := ctx.NewMap()
 	throwingFn := createThrowingFunction(ctx, errorMsg)
-	result.SetPropertyStr(methodName, throwingFn)
-	return qjs.NewMap(result.Value)
+	m.SetPropertyStr(methodName, throwingFn)
+	return qjs.NewMap(m.Value)
 }
 
 // setupArrayWithFailingMethod creates an array with a method that throws an error
 func setupArrayWithFailingMethod(ctx *qjs.Context, methodName, errorMsg string) *qjs.Array {
-	result := ctx.NewArray()
+	array := ctx.NewArray()
 	throwingFn := createThrowingFunction(ctx, errorMsg)
-	result.SetPropertyStr(methodName, throwingFn)
-	return qjs.NewArray(result.Value)
+	array.SetPropertyStr(methodName, throwingFn)
+	return qjs.NewArray(array.Value)
 }
 
 // setupSetWithFailingMethod creates a set with a method that throws an error
 func setupSetWithFailingMethod(ctx *qjs.Context, methodName, errorMsg string) *qjs.Set {
-	result := ctx.NewSet()
+	s := ctx.NewSet()
 	throwingFn := createThrowingFunction(ctx, errorMsg)
-	result.SetPropertyStr(methodName, throwingFn)
-	return qjs.NewSet(result.Value)
+	s.SetPropertyStr(methodName, throwingFn)
+	return qjs.NewSet(s.Value)
 }
 
 // Array Tests
@@ -81,9 +81,9 @@ func TestArray(t *testing.T) {
 	})
 
 	t.Run("create_from_valid_array", func(t *testing.T) {
-		arr := ctx.NewArray()
-		defer arr.Free()
-		wrappedArr := qjs.NewArray(arr.Value)
+		array := ctx.NewArray()
+		defer array.Free()
+		wrappedArr := qjs.NewArray(array.Value)
 		assert.NotNil(t, wrappedArr)
 		assert.Equal(t, int64(0), wrappedArr.Len())
 	})
@@ -509,39 +509,39 @@ func TestSet(t *testing.T) {
 	})
 
 	t.Run("add_has_delete_operations", func(t *testing.T) {
-		set := ctx.NewSet()
-		defer set.Free()
+		s := ctx.NewSet()
+		defer s.Free()
 
 		str1, _, _, int1, bool1 := createTestValues(ctx)
 
 		// Add values
-		set.Add(str1)
-		set.Add(int1)
-		set.Add(bool1)
+		s.Add(str1)
+		s.Add(int1)
+		s.Add(bool1)
 
 		// Duplicate addition should not error
-		set.Add(str1)
+		s.Add(str1)
 
 		// Check existence
-		assert.True(t, set.Has(str1))
-		assert.False(t, set.Has(ctx.NewString("missing")))
+		assert.True(t, s.Has(str1))
+		assert.False(t, s.Has(ctx.NewString("missing")))
 
 		// Delete value
-		set.Delete(str1)
-		assert.False(t, set.Has(str1))
+		s.Delete(str1)
+		assert.False(t, s.Has(str1))
 	})
 
 	t.Run("forEach_iteration", func(t *testing.T) {
-		set := ctx.NewSet()
-		defer set.Free()
+		s := ctx.NewSet()
+		defer s.Free()
 
 		str1, str2, str3, _, _ := createTestValues(ctx)
-		set.Add(str1)
-		set.Add(str2)
-		set.Add(str3)
+		s.Add(str1)
+		s.Add(str2)
+		s.Add(str3)
 
 		values := make([]string, 0)
-		set.ForEach(func(value *qjs.Value) {
+		s.ForEach(func(value *qjs.Value) {
 			values = append(values, value.String())
 		})
 
@@ -552,29 +552,29 @@ func TestSet(t *testing.T) {
 	})
 
 	t.Run("to_array_conversion", func(t *testing.T) {
-		set := ctx.NewSet()
-		defer set.Free()
+		s := ctx.NewSet()
+		defer s.Free()
 
 		str1, _, _, int1, bool1 := createTestValues(ctx)
-		set.Add(str1)
-		set.Add(int1)
-		set.Add(bool1)
+		s.Add(str1)
+		s.Add(int1)
+		s.Add(bool1)
 
-		array := set.ToArray()
+		array := s.ToArray()
 		defer array.Free()
 		assert.Equal(t, int64(3), array.Len())
 	})
 
 	t.Run("json_stringify_output", func(t *testing.T) {
-		set := ctx.NewSet()
-		defer set.Free()
+		s := ctx.NewSet()
+		defer s.Free()
 
 		str1, _, _, int1, bool1 := createTestValues(ctx)
-		set.Add(str1)
-		set.Add(int1)
-		set.Add(bool1)
+		s.Add(str1)
+		s.Add(int1)
+		s.Add(bool1)
 
-		json := must(set.JSONStringify())
+		json := must(s.JSONStringify())
 		assert.Contains(t, json, "hello")
 		assert.Contains(t, json, "42")
 		assert.Contains(t, json, "true")

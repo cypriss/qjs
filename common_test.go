@@ -646,14 +646,14 @@ func TestChannelToJSObjectValue(t *testing.T) {
 
 	t.Run("BidirectionalChannelProperties", func(t *testing.T) {
 		ch := make(chan string, 5)
-		chRType := reflect.TypeOf(ch)
+		chType := reflect.TypeOf(ch)
 		chRValue := reflect.ValueOf(ch)
-		chValue, err := qjs.ChannelToJSObjectValue(ctx, chRType, chRValue)
+		jsChan, err := qjs.ChannelToJSObjectValue(ctx, chType, chRValue)
 		require.NoError(t, err)
-		defer chValue.Free()
+		defer jsChan.Free()
 
-		assert.True(t, chValue.IsObject())
-		ctx.Global().SetPropertyStr("ch", chValue)
+		assert.True(t, jsChan.IsObject())
+		ctx.Global().SetPropertyStr("ch", jsChan)
 
 		result, err := ctx.Eval("test.js", qjs.Code(`
 			([

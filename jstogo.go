@@ -167,20 +167,20 @@ func jsArrayToGoWithContext[T any](
 }
 
 func mapEntryToGoWithContext(
-	ctx *Tracker[uint64],
+	tracker *Tracker[uint64],
 	jsKey, jsValue *Value,
 	goKeyType, goValueType reflect.Type,
 ) (k, v reflect.Value, err error) {
 	keySample := reflect.New(goKeyType).Elem().Interface()
 
-	goKeyFromJs, keyErr := jsValueToGo(ctx, jsKey, keySample)
+	goKeyFromJs, keyErr := jsValueToGo(tracker, jsKey, keySample)
 	if keyErr != nil {
 		return k, v, newJsToGoErr(jsKey, keyErr, "map key")
 	}
 
 	k = reflect.ValueOf(goKeyFromJs).Convert(goKeyType)
 	valueSample := reflect.New(goValueType).Elem().Interface()
-	goValFromJs, valErr := jsValueToGo(ctx, jsValue, valueSample)
+	goValFromJs, valErr := jsValueToGo(tracker, jsValue, valueSample)
 
 	switch {
 	case valErr != nil:
@@ -508,9 +508,9 @@ func jsFuncToGo[T any](
 		return v, err
 	}
 
-	ctx := input.Context()
+	goContext := input.Context()
 	goFunc := func(args []reflect.Value) (results []reflect.Value) {
-		return createJsFunctionHandler(ctx, input, tracker, fnType, args)
+		return createJsFunctionHandler(goContext, input, tracker, fnType, args)
 	}
 
 	fn := reflect.MakeFunc(fnType, goFunc)
@@ -521,7 +521,7 @@ func jsFuncToGo[T any](
 
 // createJsFunctionHandler handles the execution of JavaScript functions from Go.
 func createJsFunctionHandler(
-	ctx *Context,
+	c *Context,
 	input *Value,
 	tracker *Tracker[uint64],
 	fnType reflect.Type,
@@ -532,7 +532,7 @@ func createJsFunctionHandler(
 		results[i] = reflect.Zero(fnType.Out(i))
 	}
 
-	jsArgs, err := convertArgsToJS(ctx, fnType, args, results)
+	jsArgs, err := convertArgsToJS(c, fnType, args, results)
 	if err != nil {
 		return results
 	}
@@ -543,7 +543,7 @@ func createJsFunctionHandler(
 		}
 	}()
 
-	jsResult, err := ctx.Invoke(input, ctx.Global(), jsArgs...)
+	jsResult, err := c.Invoke(input, c.Global(), jsArgs...)
 	if err != nil {
 		results[len(results)-1] = reflect.ValueOf(
 			fmt.Errorf("JS function execution failed: %w", err),
@@ -559,7 +559,7 @@ func createJsFunctionHandler(
 
 // convertArgsToJS converts Go function arguments to JavaScript values.
 func convertArgsToJS(
-	ctx *Context,
+	c *Context,
 	fnType reflect.Type,
 	args []reflect.Value,
 	results []reflect.Value,
@@ -580,7 +580,7 @@ func convertArgsToJS(
 	jsArgs := make([]*Value, 0, expectedArgsCount)
 
 	convertArg := func(argValue any, argIndex int) error {
-		jsArg, convErr := ToJSValue(ctx, argValue)
+		jsArg, convErr := ToJSValue(c, argValue)
 		if convErr != nil {
 			results[len(results)-1] = reflect.ValueOf(
 				fmt.Errorf(

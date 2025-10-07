@@ -107,14 +107,14 @@ func testLoadOperations(t *testing.T) {
 		{
 			name: "mixed_loading_scenario",
 			file: "03_mixed_load.js",
-			prepare: func(rt *qjs.Runtime) {
-				_ = must(rt.Load("mod_a.js", qjs.Code("export const getA = () => 'A';")))
-				_ = must(rt.Load("./testdata/04_load/03_mixed/mod_b"))
-				_ = must(rt.Load("./testdata/04_load/03_mixed/mod_c"))
-				bytesD := must(rt.Compile("mod_d.js", qjs.Code("export const getD = () => 'D';"), qjs.TypeModule()))
-				_ = must(rt.Load("mod_d.js", qjs.Bytecode(bytesD)))
-				bytesE := must(rt.Compile("./testdata/04_load/03_mixed/mod_e", qjs.TypeModule()))
-				_ = must(rt.Load("./testdata/04_load/03_mixed/mod_e", qjs.Bytecode(bytesE)))
+			prepare: func(runtime *qjs.Runtime) {
+				_ = must(runtime.Load("mod_a.js", qjs.Code("export const getA = () => 'A';")))
+				_ = must(runtime.Load("./testdata/04_load/03_mixed/mod_b"))
+				_ = must(runtime.Load("./testdata/04_load/03_mixed/mod_c"))
+				bytesD := must(runtime.Compile("mod_d.js", qjs.Code("export const getD = () => 'D';"), qjs.TypeModule()))
+				_ = must(runtime.Load("mod_d.js", qjs.Bytecode(bytesD)))
+				bytesE := must(runtime.Compile("./testdata/04_load/03_mixed/mod_e", qjs.TypeModule()))
+				_ = must(runtime.Load("./testdata/04_load/03_mixed/mod_e", qjs.Bytecode(bytesE)))
 			},
 			code: `import { getA } from 'mod_a.js'; import { getB } from './03_mixed/mod_b'; import { getC } from './03_mixed/mod_c'; import { getD } from 'mod_d.js'; import { getE } from './03_mixed/mod_e'; export const moduleExported = getA() + getB() + getC() + getD() + getE();`,
 			expectValue: func(t *testing.T, val *qjs.Value, err error) {

@@ -15,10 +15,10 @@ import (
 )
 
 func setupTestContext(_ *testing.T) (*qjs.Runtime, *qjs.Context) {
-	runtime := must(qjs.New())
-	ctx := runtime.Context()
+	rt := must(qjs.New())
+	ctx := rt.Context()
 	// t.Cleanup(runtime.Close)
-	return runtime, ctx
+	return rt, ctx
 }
 
 type CustomUnmarshaler struct {
@@ -198,11 +198,11 @@ func genModeGlobalTests(t *testing.T) []modeGlobalTest {
 			expect: func(val *qjs.Value, err error) {
 				// Assuming arrays are returned as objects with numeric keys.
 				assert.True(t, val.IsArray())
-				arrObj := val.Object()
-				defer arrObj.Free()
-				assert.Equal(t, int32(1), arrObj.GetPropertyStr("0").Int32())
-				assert.Equal(t, int32(2), arrObj.GetPropertyStr("1").Int32())
-				assert.Equal(t, int32(3), arrObj.GetPropertyStr("2").Int32())
+				obj := val.Object()
+				defer obj.Free()
+				assert.Equal(t, int32(1), obj.GetPropertyStr("0").Int32())
+				assert.Equal(t, int32(2), obj.GetPropertyStr("1").Int32())
+				assert.Equal(t, int32(3), obj.GetPropertyStr("2").Int32())
 			},
 		},
 	}
@@ -213,22 +213,22 @@ func genModeGlobalTests(t *testing.T) []modeGlobalTest {
 func runModeGlobalTests(t *testing.T, tests []modeGlobalTest, isScript bool) {
 	for _, test := range tests {
 		t.Run(test.file, func(t *testing.T) {
-			runtime := must(qjs.New(&qjs.Option{
+			rt := must(qjs.New(&qjs.Option{
 				MaxStackSize: 512 * 1024,
 			}))
-			defer runtime.Close()
+			defer rt.Close()
 			var val *qjs.Value
 			var err error
 
 			fileName := path.Join("./testdata/01_global", test.file)
 			if isScript {
 				script := fileContent(fileName)
-				val, err = runtime.Eval(
+				val, err = rt.Eval(
 					fileName,
 					qjs.Code(script),
 				)
 			} else {
-				val, err = runtime.Eval(fileName)
+				val, err = rt.Eval(fileName)
 			}
 
 			defer val.Free()
@@ -311,12 +311,12 @@ func genModeModuleTests(t *testing.T) []modeModuleTest {
 func runModeModuleTests(t *testing.T, tests []modeModuleTest, isScript bool) {
 	for _, test := range tests {
 		t.Run(test.moduleDir, func(t *testing.T) {
-			runtime := must(qjs.New())
-			defer runtime.Close()
+			rt := must(qjs.New())
+			defer rt.Close()
 
 			if !isScript {
 				moduleMainFile := filepath.Join("./testdata/02_module", test.moduleDir, "999_index.js")
-				val, err := runtime.Eval(
+				val, err := rt.Eval(
 					moduleMainFile,
 					qjs.TypeModule(),
 				)
@@ -338,7 +338,7 @@ func runModeModuleTests(t *testing.T, tests []modeModuleTest, isScript bool) {
 			depPaths := moduleFiles[:len(moduleFiles)-1]
 			for _, depPath := range depPaths {
 				depScript := fileContent(depPath)
-				val, err := runtime.Load(
+				val, err := rt.Load(
 					depPath,
 					qjs.Code(depScript),
 					qjs.TypeModule(),
@@ -349,7 +349,7 @@ func runModeModuleTests(t *testing.T, tests []modeModuleTest, isScript bool) {
 
 			// Evaluate the main module.
 			mainScript := fileContent(mainPath)
-			val, err := runtime.Eval(
+			val, err := rt.Eval(
 				mainPath,
 				qjs.Code(mainScript),
 				qjs.TypeModule(),
