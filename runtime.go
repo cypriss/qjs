@@ -233,7 +233,7 @@ func (r *Runtime) CallUnPack(name string, args ...uint64) (uint32, uint32) {
 	return r.mem.UnpackPtr(r.Call(name, args...).raw)
 }
 
-// Malloc allocates memory in the WebAssembly linear memory and return a pointer to it.
+// Malloc allocates memory in the WebAssembly linear memory and returns a pointer to it.
 func (r *Runtime) Malloc(size uint64) uint64 {
 	ptrs, err := r.malloc.Call(r.context, size)
 	if err != nil {

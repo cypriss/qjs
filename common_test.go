@@ -138,7 +138,7 @@ func TestParseTimezone(t *testing.T) {
 	})
 }
 
-// Test struct types for FieldMapper concurrency testing
+// Test struct types for FieldMapper concurrency testing.
 type ConcurrencyTestStruct struct {
 	Name   string
 	Value  int

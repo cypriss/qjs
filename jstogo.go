@@ -105,7 +105,7 @@ func JsArrayBufferToGo(input *Value) ([]byte, error) {
 	return input.ToByteArray(), nil
 }
 
-// JsTypedArrayToGo return the underlying byte slice from a TypedArray/DataView.
+// JsTypedArrayToGo returns the underlying byte slice from a TypedArray/DataView.
 func JsTypedArrayToGo(input *Value) ([]byte, error) {
 	buffer := input.GetPropertyStr("buffer")
 	defer buffer.Free()

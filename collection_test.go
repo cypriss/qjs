@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// setupRuntime creates a new runtime and context for testing
+// setupRuntime creates a new runtime and context for testing.
 func setupRuntime(t *testing.T) (*qjs.Runtime, *qjs.Context) {
 	t.Helper()
 	rt := must(qjs.New())
@@ -17,7 +17,7 @@ func setupRuntime(t *testing.T) (*qjs.Runtime, *qjs.Context) {
 	return rt, rt.Context()
 }
 
-// createTestValues creates common test values for collection testing
+// createTestValues creates common test values for collection testing.
 func createTestValues(ctx *qjs.Context) (string1, string2, string3, int1, bool1 *qjs.Value) {
 	return ctx.NewString("hello"),
 		ctx.NewString("world"),
@@ -26,14 +26,14 @@ func createTestValues(ctx *qjs.Context) (string1, string2, string3, int1, bool1 
 		ctx.NewBool(true)
 }
 
-// createThrowingFunction creates a function that throws an error when called
+// createThrowingFunction creates a function that throws an error when called.
 func createThrowingFunction(ctx *qjs.Context, errorMsg string) *qjs.Value {
 	return ctx.Function(func(t *qjs.This) (*qjs.Value, error) {
 		return nil, fmt.Errorf("%s", errorMsg)
 	})
 }
 
-// setupMapWithFailingMethod creates a map with a method that throws an error
+// setupMapWithFailingMethod creates a map with a method that throws an error.
 func setupMapWithFailingMethod(ctx *qjs.Context, methodName, errorMsg string) *qjs.Map {
 	result := ctx.NewMap()
 	throwingFn := createThrowingFunction(ctx, errorMsg)
@@ -41,7 +41,7 @@ func setupMapWithFailingMethod(ctx *qjs.Context, methodName, errorMsg string) *q
 	return qjs.NewMap(result.Value)
 }
 
-// setupArrayWithFailingMethod creates an array with a method that throws an error
+// setupArrayWithFailingMethod creates an array with a method that throws an error.
 func setupArrayWithFailingMethod(ctx *qjs.Context, methodName, errorMsg string) *qjs.Array {
 	result := ctx.NewArray()
 	throwingFn := createThrowingFunction(ctx, errorMsg)
@@ -49,7 +49,7 @@ func setupArrayWithFailingMethod(ctx *qjs.Context, methodName, errorMsg string) 
 	return qjs.NewArray(result.Value)
 }
 
-// setupSetWithFailingMethod creates a set with a method that throws an error
+// setupSetWithFailingMethod creates a set with a method that throws an error.
 func setupSetWithFailingMethod(ctx *qjs.Context, methodName, errorMsg string) *qjs.Set {
 	result := ctx.NewSet()
 	throwingFn := createThrowingFunction(ctx, errorMsg)

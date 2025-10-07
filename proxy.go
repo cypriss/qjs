@@ -92,6 +92,7 @@ func (r *ProxyRegistry) Clear() {
 // to the following C declaration:
 //
 //	__attribute__((import_module("env"), import_name("jsFunctionProxy")))
+//
 //	extern JSValue jsFunctionProxy(JSContext *ctx, JSValueConst this, int argc, JSValueConst *argv);
 //
 // Parameters:

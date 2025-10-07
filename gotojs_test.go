@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test data structures for struct conversion tests
+// Test data structures for struct conversion tests.
 type SimpleStruct struct {
 	Name string
 	Age  int
@@ -134,7 +134,7 @@ type StructWithInvalidMethod struct {
 	Value int
 }
 
-// InvalidMethod has an unsupported signature that will cause FuncToJS to fail
+// InvalidMethod has an unsupported signature that will cause FuncToJS to fail.
 func (s StructWithInvalidMethod) InvalidMethod() unsafe.Pointer {
 	return unsafe.Pointer(&[]byte{1}[0]) // unsafe.Pointer is not supported by FuncToJS
 }

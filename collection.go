@@ -108,7 +108,7 @@ func (m *Map) IsMap() bool {
 	return m != nil && m.Value != nil
 }
 
-// IsObject returns true if this is a valid Map, mainly used to satisfy ObjectOrMap.
+// IsObject returns true if this is a valid Map. Mainly used to satisfy ObjectOrMap.
 func (m *Map) IsObject() bool {
 	return m != nil && m.Value != nil
 }
