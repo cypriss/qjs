@@ -101,6 +101,9 @@ func Bytecode(buf []byte) EvalOptionFunc {
 }
 
 // TypeGlobal sets evaluation to run in global scope (default behavior).
+//
+// BUG: TypeGlobal does not clear the eval-type bits, so OR-ing JsEvalTypeGlobal (0) into flags
+// cannot override a previously set type.
 func TypeGlobal() EvalOptionFunc {
 	return func(o *EvalOption) {
 		o.flags |= JsEvalTypeGlobal
@@ -108,6 +111,9 @@ func TypeGlobal() EvalOptionFunc {
 }
 
 // TypeModule sets evaluation to run as ES6 module.
+//
+// BUG: TypeModule should clear existing eval-type bits (JsEvalTypeMask) before setting JsEvalTypeModule;
+// otherwise combining with other eval types may not result in module evaluation.
 func TypeModule() EvalOptionFunc {
 	return func(o *EvalOption) {
 		o.flags |= JsEvalTypeModule
@@ -115,7 +121,7 @@ func TypeModule() EvalOptionFunc {
 }
 
 // FlagAsync enables top-level await in global scripts. Returns a promise from JS_Eval(). Only
-// valid with TypeGlobal.
+// valid with JsEvalTypeGlobal.
 func FlagAsync() EvalOptionFunc {
 	return func(o *EvalOption) {
 		o.flags |= JsEvalFlagAsync
@@ -129,8 +135,9 @@ func FlagStrict() EvalOptionFunc {
 	}
 }
 
-// FlagCompileOnly compiles code without execution. Returns bytecode object for later execution
-// with JS_EvalFunction().
+// FlagCompileOnly compiles code without execution. It returns an EvalOptionFunc that sets
+// JsEvalFlagCompileOnly; when applied, the evaluator produces a bytecode/module for later
+// execution with JS_EvalFunction().
 func FlagCompileOnly() EvalOptionFunc {
 	return func(o *EvalOption) {
 		o.flags |= JsEvalFlagCompileOnly
@@ -152,6 +159,9 @@ func TypeIndirect() EvalOptionFunc {
 }
 
 // TypeMask applies eval type mask (internal QuickJS use).
+//
+// BUG: TypeMask ORs JsEvalTypeMask into flags, which sets both eval type bits and effectively
+// forces JsEvalTypeInDirect; it should apply the mask instead (ex, use bitwise AND).
 func TypeMask() EvalOptionFunc {
 	return func(o *EvalOption) {
 		o.flags |= JsEvalTypeMask

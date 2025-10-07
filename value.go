@@ -360,12 +360,16 @@ func (v *Value) SetPropertyIndex(index int64, val *Value) {
 	v.Call("JS_SetPropertyUint32", v.Ctx(), v.Raw(), uint64(index), val.Raw())
 }
 
-// GetPropertyIndex returns the value of the property with the given index.
+// GetPropertyIndex returns the value of the property at the given index, which is interpreted
+// as a uint32. Indices outside the uint32 range (including negatives) are converted/truncated
+// to uint32.
 func (v *Value) GetPropertyIndex(index int64) *Value {
 	return v.Call("QJS_GetPropertyUint32", v.Ctx(), v.Raw(), uint64(index))
 }
 
-// Len returns the length of the array.
+// Len returns the numeric value of the JavaScript "length" property of v. It does not verify
+// that v is an array; it applies to any value that exposes a "length" property (ex: arrays,
+// strings, typed arrays, functions).
 func (v *Value) Len() int64 {
 	l := v.GetPropertyStr("length")
 	defer l.Free()
@@ -559,7 +563,7 @@ func (v *Value) Object() *Value {
 }
 
 // ForEach iterates over the properties of the object and calls the given function for each
-// property.
+// property, except for the "length" property.
 func (v *Value) ForEach(fn func(key *Value, value *Value)) {
 	if !v.IsObject() {
 		return
@@ -647,8 +651,8 @@ func (v *Value) Bool() bool {
 	return v.Call("JS_ToBool", v.Ctx(), v.Raw()).handle.Bool()
 }
 
-// Int32 returns the int32 value of the value. in c int is 32 bit, but in go it is depends
-// on the architecture.
+// Int32 returns the int32 value of the value. In C, the size of int is implementation-defined;
+// in Go, int is architecture-dependent. on the architecture.
 func (v *Value) Int32() int32 {
 	return v.Call("QJS_ToInt32", v.Ctx(), v.Raw()).handle.Int32()
 }

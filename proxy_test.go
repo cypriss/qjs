@@ -26,7 +26,7 @@ type proxyErrorTestCase struct {
 	errorCheck  func(*testing.T, error)
 }
 
-// setupTestRuntime creates a runtime with cleanup for proxy tests
+// setupProxyTestRuntime creates a runtime with cleanup for proxy tests.
 func setupProxyTestRuntime(t *testing.T) *qjs.Runtime {
 	runtime := must(qjs.New())
 	t.Cleanup(func() { runtime.Close() })

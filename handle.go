@@ -6,8 +6,9 @@ import (
 	"sync/atomic"
 )
 
-// Handle represents a reference to a QuickJS value. It manages raw pointer values from WebAssembly
-// memory and provides safe type conversion methods with proper resource management.
+// Handle wraps raw WebAssembly pointers (ex: C strings, byte buffers, runtime/module handles)
+// and provides safe type conversion methods with proper resource management. It is not a QuickJS
+// value wrapper and is not used to free JS values.
 type Handle struct {
 	raw     uint64
 	runtime *Runtime
@@ -29,7 +30,7 @@ func NewHandle(runtime *Runtime, ptr uint64) *Handle {
 }
 
 // Free releases the memory associated with this handle. Only used with C values such as: QJS_ToCString,
-// QJS_JSONStringify. Do not use this method for JsValue.
+// QJS_JSONStringify. Do not use this method for Value; JS values should be freed via Value.Free.
 func (h *Handle) Free() {
 	if h == nil || h.runtime == nil {
 		return
@@ -64,7 +65,8 @@ func (h *Handle) Bool() bool {
 	return int32(h.raw) != 0
 }
 
-// Signed integer conversion methods with bounds checking.
+// Signed is a type constraint that matches the built-in signed integer types. It defines no
+// methods and performs no bounds checking.
 type Signed interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64
 }
@@ -81,7 +83,8 @@ type Float interface {
 	~float32 | ~float64
 }
 
-// ConvertToSigned performs safe conversion to signed integer types with bounds checking.
+// ConvertToSigned converts to signed integer types using sign extension when applicable. It
+// does not perform bounds or overflow checking; values are truncated to the target width.
 func ConvertToSigned[T Signed](h *Handle) T {
 	if h == nil || h.IsFreed() {
 		return T(0)
@@ -192,9 +195,8 @@ func (h *Handle) String() string {
 	return h.runtime.mem.StringFromPackedPtr(h.raw)
 }
 
-// Bytes converts the handle value to []byte by reading from QuickJS memory. Returns empty
-// slice for zero handles or if the handle is freed. The returned bytes are a copy and safe
-// to modify.
+// Bytes converts the handle value to []byte by reading from QuickJS memory. Returns a nil
+// slice for zero or freed handles. The returned bytes are a copy and safe to modify.
 func (h *Handle) Bytes() []byte {
 	if h == nil || h.IsFreed() || h.raw == 0 {
 		return nil

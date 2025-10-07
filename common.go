@@ -147,7 +147,12 @@ func (fm *FieldMapper) GetFieldMap(structType reflect.Type) map[string]FieldPath
 	return fieldMap
 }
 
-// processFields recursively processes struct fields including embedded struct promotion.
+// processFields recursively processes struct fields and attempts to promote embedded fields.
+//
+// BUG: processFields does not follow Go's field promotion rules: due to depth-first traversal
+// and first-win logic, a deeper embedded field can override a shallower top-level field encountered
+// later, and same-depth name collisions are not treated as ambiguous (neither should be promoted)
+// but instead the first encountered is chosen.
 func (fm *FieldMapper) processFields(
 	structType reflect.Type,
 	indexPrefix []int,
@@ -558,7 +563,8 @@ func NumericBoundsCheck(floatVal float64, targetKind reflect.Kind) error {
 	return nil
 }
 
-// IsTypedArray returns true if the input is TypedArray or DataView.
+// IsTypedArray returns true if the input is a supported JavaScript TypedArray or a DataView.
+// Uint8ClampedArray is not considered a TypedArray by this function.
 func IsTypedArray(input *Value) bool {
 	for _, typeName := range typedArrayTypes {
 		if input.IsGlobalInstanceOf(typeName) {
@@ -836,6 +842,9 @@ func hashBytes(data []byte) uint64 {
 
 // ParseTimezone attempts to parse a timezone string as either an IANA location name or a UTC
 // offset format (+/-HH:MM). Returns UTC location if parsing fails.
+//
+// BUG: ParseTimezone should be fixed to return UTC for an empty string input instead of panicking
+// when accessing tz[0].
 func ParseTimezone(tz string) *time.Location {
 	// First try to parse as IANA timezone name (e.g., "America/New_York", "Asia/Tokyo")
 	if loc, err := time.LoadLocation(tz); err == nil {
@@ -876,12 +885,12 @@ func ParseTimezone(tz string) *time.Location {
 	return time.UTC
 }
 
-// Is32BitPlatform check if the platform is 32-bit by comparing the size of uintptr.
+// Is32BitPlatform checks whether the platform is 32-bit by comparing the size of int.
 func Is32BitPlatform() bool {
 	return strconv.IntSize == 32
 }
 
-// ChannelToJSObjectValue converts a Go channel to a JavaScript object with async methods.
+// ChannelToJSObjectValue converts a Go channel to a JavaScript object with synchronous methods.
 func ChannelToJSObjectValue(
 	c *Context,
 	rtype reflect.Type,

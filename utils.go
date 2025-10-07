@@ -19,7 +19,8 @@ func IsImplementError(rtype reflect.Type) bool {
 	return rtype.Implements(reflect.TypeOf((*error)(nil)).Elem())
 }
 
-// IsImplementsJSONUnmarshaler checks if a type implements json.Unmarshaler.
+// IsImplementsJSONUnmarshaler reports whether t implements json.Unmarshaler, either as the
+// type itself or via a pointer to the type.
 func IsImplementsJSONUnmarshaler(t reflect.Type) bool {
 	unmarshalerType := reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
 

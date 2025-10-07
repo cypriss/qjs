@@ -84,8 +84,9 @@ func (m *Mem) MustRead(addr uint32, size uint64) []byte {
 	return buf
 }
 
-// Write copies the contents of byte slice b to WebAssembly memory starting at the given address.
-// Uses Read to validate address and bounds before writing.
+// Write copies the contents of byte slice b into the slice returned by Read starting at the
+// given address. Uses Read to validate address and bounds; it does not directly write to WebAssembly
+// memory.
 func (m *Mem) Write(addr uint32, b []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -242,6 +243,9 @@ func (m *Mem) ReadString(addr, maxlen uint32) (string, error) {
 
 // WriteString writes a null-terminated string to WebAssembly memory. It copies the string
 // content to the specified memory address and appends a null terminator.
+//
+// BUG: WriteString currently modifies the slice returned by Read, which is a copy, so changes
+// are not persisted to WebAssembly memory. It should write directly to the underlying memory.
 func (m *Mem) WriteString(ptr uint32, s string) error {
 	size := uint64(len(s) + 1) // +1 for null terminator
 
