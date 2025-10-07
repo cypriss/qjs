@@ -24,8 +24,8 @@ func NewProxyRegistry() *ProxyRegistry {
 	}
 }
 
-// Register adds a function to the registry and returns its unique ID. This method is thread-safe
-// and can be called concurrently.
+// Register adds a value of any type to the registry and returns its unique ID. This method
+// is thread-safe and can be called concurrently.
 func (r *ProxyRegistry) Register(fn any) uint64 {
 	if fn == nil {
 		return 0
@@ -39,8 +39,8 @@ func (r *ProxyRegistry) Register(fn any) uint64 {
 	return id
 }
 
-// Get retrieves a function by its ID. Returns the function and true if found, nil and false
-// otherwise. This method is thread-safe and can be called concurrently.
+// Get retrieves a value by its ID. Returns the value and true if found, nil and false otherwise.
+// This method is thread-safe and can be called concurrently.
 func (r *ProxyRegistry) Get(id uint64) (any, bool) {
 	if id == 0 {
 		return nil, false
@@ -95,8 +95,9 @@ func (r *ProxyRegistry) Clear() {
 //	extern JSValue jsFunctionProxy(JSContext *ctx, JSValueConst this, int argc, JSValueConst *argv);
 //
 // Parameters:
-//   - ctx: JSContext pointer
-//   - this: JSValueConst this (the "this" value)
+//   - ctx: context.Context.
+//   - jsCtx: JSContext pointer.
+//   - thisVal: JSValueConst this (the "this" value).
 //   - argc: int argc (number of arguments)
 //   - argv: pointer to argv (an array of JSValueConst/JSValue, each 8 bytes - uint64)
 type JsFunctionProxy = func(
@@ -187,7 +188,7 @@ func getProxyFuncParams(
 	return goFunc, this
 }
 
-// extractPromiseIfAsync extracts the promise handle for async functions.
+// extractPromiseIfAsync extracts the promise value for async functions.
 func extractPromiseIfAsync(context *Context, args []uint64, isAsync uint64) *Value {
 	if isAsync == 0 {
 		return context.NewUndefined()
@@ -198,7 +199,8 @@ func extractPromiseIfAsync(context *Context, args []uint64, isAsync uint64) *Val
 	return context.NewValue(NewHandle(context.runtime, promiseHandle))
 }
 
-// extractFunctionArguments extracts and clones function arguments from WASM memory.
+// extractFunctionArguments extracts and clones function arguments from the provided args slice
+// of handles.
 func extractFunctionArguments(context *Context, args []uint64) []*Value {
 	fnArgs := make([]*Value, len(args)-4)
 	for i := range fnArgs {
@@ -224,7 +226,8 @@ func createThisContext(context *Context, thisRef uint64, args []*Value, promise 
 	return this
 }
 
-// retrieveGoResources retrieves and validates Go function and context from the registry.
+// retrieveGoResources retrieves the Go function and context from the registry. It does not
+// perform validation; failed lookups or type assertions yield nil values.
 func retrieveGoResources(
 	registry *ProxyRegistry,
 	functionHandle uint64,
@@ -239,8 +242,9 @@ func retrieveGoResources(
 	return goFunc, goContext
 }
 
-// readArgsFromWasmMem reads the argument array from WASM memory with proper validation. Each
-// argument is 8 bytes (uint64) in little-endian format.
+// readArgsFromWasmMem reads the argument array from WASM memory without performing validation.
+// Each argument is 8 bytes (uint64) in little-endian format. It assumes mem.Read succeeds
+// and ignores the success flag.
 func readArgsFromWasmMem(mem api.Memory, argc uint32, argv uint32) []uint64 {
 	args := make([]uint64, argc)
 

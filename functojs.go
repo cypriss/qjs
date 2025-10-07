@@ -125,7 +125,9 @@ func handlePointerArgument(jsArg *Value, argType reflect.Type) (reflect.Value, e
 	return ptrVal, nil
 }
 
-// CreateNonNilSample creates appropriate non-nil samples for types that have nil zero values.
+// CreateNonNilSample creates appropriate samples for types that have nil zero values. For
+// interface types, it returns nil to let the conversion use the default logic which can handle
+// dynamic type inference.
 func CreateNonNilSample(argType reflect.Type) any {
 	switch argType.Kind() {
 	case reflect.Interface:

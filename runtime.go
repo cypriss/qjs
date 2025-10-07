@@ -169,7 +169,8 @@ func (r *Runtime) String() string {
 	return fmt.Sprintf("QJSRuntime: %p", r)
 }
 
-// Close cleanly shuts down the runtime and frees all associated resources.
+// Close cleanly shuts down module- and handle-level resources and clears internal references.
+// It does not close the underlying wazero.Runtime (wrt).
 func (r *Runtime) Close() {
 	if r == nil {
 		return
@@ -203,7 +204,8 @@ func (r *Runtime) Close() {
 	r.mem = nil
 }
 
-// Load executes a JavaScript file in the runtime's context.
+// Load loads a JavaScript module into the runtime's context without evaluating it. It forwards
+// to Context.Load and does not execute code; it supports modules only, not arbitrary scripts.
 func (r *Runtime) Load(file string, flags ...EvalOptionFunc) (*Value, error) {
 	return r.context.Load(file, flags...)
 }
@@ -255,7 +257,8 @@ func (r *Runtime) FreeJsValue(val uint64) {
 	r.Call("QJS_FreeValue", r.context.Raw(), val)
 }
 
-// NewBytesHandle creates a handle for byte data in WebAssembly memory.
+// NewBytesHandle creates a handle for byte data in WebAssembly memory. It returns nil if b
+// is empty.
 func (r *Runtime) NewBytesHandle(b []byte) *Handle {
 	if len(b) == 0 {
 		return nil

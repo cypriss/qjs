@@ -121,7 +121,8 @@ func (c *Context) SetAsyncFunc(name string, fn AsyncFunction) {
 	global.SetPropertyStr(name, jsFn)
 }
 
-// ParseJSON parses given JSON string and returns an object value.
+// ParseJSON parses the given JSON string and returns a Value of the parsed type (ex: object,
+// array, or primitive).
 func (c *Context) ParseJSON(v string) *Value {
 	cStr := c.NewStringHandle(v)
 	defer cStr.Free()

@@ -109,7 +109,9 @@ func (tracker *Tracker[T]) MapToObjectValue(
 	})
 }
 
-// GoNumberToJS converts Go numeric types to appropriate JS number types.
+// GoNumberToJS converts Go numeric types to JavaScript numeric values. It returns a Number
+// when representable, or a BigInt for large unsigned integers that cannot be represented as
+// a Number.
 func GoNumberToJS[T NumberType](c *Context, i T) *Value {
 	switch v := any(i).(type) {
 	case int32:
@@ -179,7 +181,8 @@ func MapToObjectValue(c *Context, rval reflect.Value) (*Value, error) {
 	return NewTracker[uint64]().MapToObjectValue(c, rval)
 }
 
-// tryConvertBuiltinTypes handles built-in Go types that don't require reflection.
+// tryConvertBuiltinTypes handles basic built-in types and select common standard library types
+// (ex: time.Time, *time.Time) that don't require reflection.
 func tryConvertBuiltinTypes(c *Context, v any) *Value {
 	switch val := v.(type) {
 	case bool:
@@ -207,7 +210,9 @@ func tryConvertBuiltinTypes(c *Context, v any) *Value {
 	return nil
 }
 
-// tryConvertNumeric handles all numeric types in a consolidated way.
+// tryConvertNumeric handles the built-in numeric types in a consolidated way (ex: int*, uint*,
+// float*, complex*), excluding uintptr. Named types with numeric underlying types and uintptr
+// are not handled here and are processed via reflection.
 func tryConvertNumeric(c *Context, v any) *Value {
 	switch val := v.(type) {
 	case int8:
