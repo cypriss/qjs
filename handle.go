@@ -6,17 +6,16 @@ import (
 	"sync/atomic"
 )
 
-// Handle represents a reference to a QuickJS value.
-// It manages raw pointer values from WebAssembly memory and provides safe
-// type conversion methods with proper resource management.
+// Handle represents a reference to a QuickJS value. It manages raw pointer values from WebAssembly
+// memory and provides safe type conversion methods with proper resource management.
 type Handle struct {
 	raw     uint64
 	runtime *Runtime
 	freed   int32 // atomic flag to prevent double-free
 }
 
-// NewHandle creates a new Handle wrapping the given pointer value.
-// The handle maintains a reference to the runtime for proper memory management.
+// NewHandle creates a new Handle wrapping the given pointer value. The handle maintains a
+// reference to the runtime for proper memory management.
 func NewHandle(runtime *Runtime, ptr uint64) *Handle {
 	if runtime == nil {
 		panic("handle: runtime cannot be nil")
@@ -29,9 +28,8 @@ func NewHandle(runtime *Runtime, ptr uint64) *Handle {
 	}
 }
 
-// Free releases the memory associated with this handle.
-// Only used with C values such as: QJS_ToCString, QJS_JSONStringify.
-// Do not use this method for JsValue.
+// Free releases the memory associated with this handle. Only used with C values such as: QJS_ToCString,
+// QJS_JSONStringify. Do not use this method for JsValue.
 func (h *Handle) Free() {
 	if h == nil || h.runtime == nil {
 		return
@@ -154,9 +152,8 @@ func (h *Handle) Uint32() uint32   { return ConvertToUnsigned[uint32](h) }
 func (h *Handle) Uint64() uint64   { return ConvertToUnsigned[uint64](h) }
 func (h *Handle) Uintptr() uintptr { return ConvertToUnsigned[uintptr](h) }
 
-// Float32 converts the handle value to float32 by interpreting the lower 32 bits
-// as IEEE 754 single-precision floating point representation.
-// Returns 0.0 if the handle is nil or freed.
+// Float32 converts the handle value to float32 by interpreting the lower 32 bits as IEEE 754
+// single-precision floating point representation. Returns 0.0 if the handle is nil or freed.
 func (h *Handle) Float32() float32 {
 	if h == nil || h.IsFreed() {
 		return 0.0
@@ -165,9 +162,8 @@ func (h *Handle) Float32() float32 {
 	return math.Float32frombits(uint32(h.raw))
 }
 
-// Float64 converts the handle value to float64 by interpreting the raw bits
-// as IEEE 754 double-precision floating point representation.
-// Returns 0.0 if the handle is nil or freed.
+// Float64 converts the handle value to float64 by interpreting the raw bits as IEEE 754 double-precision
+// floating point representation. Returns 0.0 if the handle is nil or freed.
 func (h *Handle) Float64() float64 {
 	if h == nil || h.IsFreed() {
 		return 0.0
@@ -176,9 +172,9 @@ func (h *Handle) Float64() float64 {
 	return math.Float64frombits(h.raw)
 }
 
-// String converts the handle value to string by unpacking a pointer
-// to string data in QuickJS memory. Returns empty string if handle is nil or freed.
-// If there's a JavaScript exception in the context, it will panic with the exception.
+// String converts the handle value to string by unpacking a pointer to string data in QuickJS
+// memory. Returns empty string if handle is nil or freed. If there's a JavaScript exception
+// in the context, it will panic with the exception.
 func (h *Handle) String() string {
 	if h == nil || h.IsFreed() {
 		return ""
@@ -196,9 +192,9 @@ func (h *Handle) String() string {
 	return h.runtime.mem.StringFromPackedPtr(h.raw)
 }
 
-// Bytes converts the handle value to []byte by reading from QuickJS memory.
-// Returns empty slice for zero handles or if the handle is freed.
-// The returned bytes are a copy and safe to modify.
+// Bytes converts the handle value to []byte by reading from QuickJS memory. Returns empty
+// slice for zero handles or if the handle is freed. The returned bytes are a copy and safe
+// to modify.
 func (h *Handle) Bytes() []byte {
 	if h == nil || h.IsFreed() || h.raw == 0 {
 		return nil

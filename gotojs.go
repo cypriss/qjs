@@ -34,8 +34,8 @@ func (tracker *Tracker[T]) ToJSValue(c *Context, v any) (*Value, error) {
 	return tracker.convertReflectValue(c, v)
 }
 
-// StructToJSObjectValue converts a Go struct to a JavaScript object.
-// Includes both fields and methods as object properties.
+// StructToJSObjectValue converts a Go struct to a JavaScript object. Includes both fields
+// and methods as object properties.
 func (tracker *Tracker[T]) StructToJSObjectValue(
 	c *Context,
 	rtype reflect.Type,
@@ -80,8 +80,8 @@ func (tracker *Tracker[T]) ArrayToArrayValue(c *Context, rval reflect.Value) (*V
 	return tracker.arrayLikeToJS(c, rval, "array")
 }
 
-// MapToObjectValue converts a Go map to a JavaScript object.
-// Non-string keys are converted to string representation.
+// MapToObjectValue converts a Go map to a JavaScript object. Non-string keys are converted
+// to string representation.
 func (tracker *Tracker[T]) MapToObjectValue(
 	c *Context,
 	rval reflect.Value,
@@ -336,8 +336,8 @@ func withJSObject(c *Context, fn func(*Value) error) (*Value, error) {
 	return obj, nil
 }
 
-// addStructFieldsToObject converts struct fields to JS object properties.
-// Processes embedded fields first, then regular fields to allow overriding.
+// addStructFieldsToObject converts struct fields to JS object properties. Processes embedded
+// fields first, then regular fields to allow overriding.
 func (tracker *Tracker[T]) addStructFieldsToObject(
 	c *Context,
 	obj *Value,

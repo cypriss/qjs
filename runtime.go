@@ -345,8 +345,8 @@ func NewPool(size int, option *Option, setupFuncs ...func(*Runtime) error) *Pool
 	return p
 }
 
-// Get returns a runtime from the pool or creates a new one if the pool is empty.
-// The caller must call Put() to return the runtime when finished.
+// Get returns a runtime from the pool or creates a new one if the pool is empty. The caller
+// must call Put() to return the runtime when finished.
 func (p *Pool) Get() (*Runtime, error) {
 	if p == nil {
 		return nil, errors.New("pool is nil")
@@ -372,8 +372,8 @@ func (p *Pool) Get() (*Runtime, error) {
 	}
 }
 
-// Put returns the runtime back to the pool for reuse.
-// If the pool is full, the runtime is closed to prevent resource leaks.
+// Put returns the runtime back to the pool for reuse. If the pool is full, the runtime is
+// closed to prevent resource leaks.
 func (p *Pool) Put(rt *Runtime) {
 	if rt == nil {
 		return

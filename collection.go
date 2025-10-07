@@ -103,8 +103,7 @@ func (m *Map) JSONStringify() (string, error) {
 	return object.JSONStringify()
 }
 
-// IsMap returns true if this is a valid Map.
-// Mainly used to satisfy ObjectOrMap.
+// IsMap returns true if this is a valid Map. Mainly used to satisfy ObjectOrMap.
 func (m *Map) IsMap() bool {
 	return m != nil && m.Value != nil
 }

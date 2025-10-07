@@ -11,7 +11,6 @@ import (
 // Context represents a QuickJS execution context with associated runtime.
 type Context struct {
 	context.Context
-
 	handle  *Handle
 	runtime *Runtime
 	global  *Value

@@ -15,16 +15,22 @@ import (
 const (
 	// MinMapForeachArgs is the minimum number of arguments for Map forEach callback (value, key).
 	MinMapForeachArgs = 2
+
 	// NanosToMillis is the conversion factor from nanoseconds to milliseconds.
 	NanosToMillis = 1e6
+
 	// Uint64ByteSize is the size of a uint64 value in bytes.
 	Uint64ByteSize = 8
+
 	// Uint64SignBitPosition is the bit position of the sign bit in a 64-bit unsigned integer.
 	Uint64SignBitPosition = 63
+
 	// PackedPtrSize is the size in bytes of a packed pointer structure.
 	PackedPtrSize = 8
+
 	// NullPtr represents a null pointer value.
 	NullPtr = uint32(0)
+
 	// StringTerminator is the null terminator byte for C-style strings.
 	StringTerminator = byte(0)
 )
@@ -220,8 +226,8 @@ func NewTracker[T uintptr | uint64]() *Tracker[T] {
 	}
 }
 
-// Track registers an object for circular reference detection.
-// Returns true if the object is already being processed (circular reference detected).
+// Track registers an object for circular reference detection. Returns true if the object is
+// already being processed (circular reference detected).
 func (tracker *Tracker[T]) Track(ptr T) bool {
 	if tracker.processing[ptr] {
 		return true
@@ -828,8 +834,8 @@ func hashBytes(data []byte) uint64 {
 	return h.Sum64()
 }
 
-// ParseTimezone attempts to parse a timezone string as either an IANA location name
-// or a UTC offset format (+/-HH:MM). Returns UTC location if parsing fails.
+// ParseTimezone attempts to parse a timezone string as either an IANA location name or a UTC
+// offset format (+/-HH:MM). Returns UTC location if parsing fails.
 func ParseTimezone(tz string) *time.Location {
 	// First try to parse as IANA timezone name (e.g., "America/New_York", "Asia/Tokyo")
 	if loc, err := time.LoadLocation(tz); err == nil {
