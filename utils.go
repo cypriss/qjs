@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// Min returns the smaller of the two provided integers.
 func Min(a, b int) int {
 	if a < b {
 		return a
@@ -15,6 +16,7 @@ func Min(a, b int) int {
 	return b
 }
 
+// IsImplementError reports whether the type implements the error interface.
 func IsImplementError(rtype reflect.Type) bool {
 	return rtype.Implements(reflect.TypeOf((*error)(nil)).Elem())
 }

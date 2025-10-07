@@ -4,6 +4,7 @@ import "fmt"
 
 // Array provides a wrapper around JavaScript arrays with Go-like methods.
 type Array struct {
+	// Value embeds the underlying JavaScript array handle.
 	*Value
 }
 
@@ -16,6 +17,7 @@ func NewArray(value *Value) *Array {
 	return &Array{Value: value}
 }
 
+// ForEach runs forFn for each index and value pair in the array.
 func (a *Array) ForEach(forFn func(key, value *Value)) {
 	if a == nil || a.Value == nil || forFn == nil {
 		return
@@ -83,6 +85,7 @@ func (a *Array) Delete(index int64) bool {
 
 // Map provides a wrapper around JavaScript Map objects with Go-like methods.
 type Map struct {
+	// Value embeds the underlying JavaScript map handle.
 	*Value
 }
 
@@ -217,6 +220,7 @@ func (m *Map) CreateObject() *Value {
 
 // Set provides a wrapper around JavaScript Set objects with Go-like methods.
 type Set struct {
+	// Value embeds the underlying JavaScript set handle.
 	*Value
 }
 

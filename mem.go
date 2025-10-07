@@ -11,7 +11,9 @@ import (
 // Mem provides a safe interface for WebAssembly memory operations.
 // It wraps the underlying wazero api.Memory with bounds checking and error handling.
 type Mem struct {
-	mu  sync.Mutex
+	// mu serializes memory read/write access to ensure thread safety.
+	mu sync.Mutex
+	// mem is the underlying WebAssembly memory instance.
 	mem api.Memory
 }
 

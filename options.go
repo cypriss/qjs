@@ -30,36 +30,56 @@ const (
 	JsEvalFlagAsync = (1 << 7)
 )
 
+// Option controls runtime-level configuration when creating a QuickJS runtime.
 type Option struct {
-	CWD               string
+	// CWD specifies the working directory used for module resolution.
+	CWD string
+	// StartFunctionName names the entry function invoked after initialization.
 	StartFunctionName string
-	Context           context.Context
-	// Enabling this option significantly increases evaluation time
-	// because every operation must check the done context, which introduces additional overhead.
+	// Context provides cancellation and deadlines for runtime operations.
+	Context context.Context
+	// CloseOnContextDone enables shutdown when the context is completed at the cost of extra checks.
 	CloseOnContextDone bool
-	DisableBuildCache  bool
-	MemoryLimit        int
-	MaxStackSize       int
-	MaxExecutionTime   int
-	GCThreshold        int
-	QuickJSWasmBytes   []byte
-	ProxyFunction      any
-	Stdout             io.Writer
-	Stderr             io.Writer
+	// DisableBuildCache prevents reusing cached compiled artifacts.
+	DisableBuildCache bool
+	// MemoryLimit caps QuickJS memory usage in bytes.
+	MemoryLimit int
+	// MaxStackSize sets the maximum stack size in bytes.
+	MaxStackSize int
+	// MaxExecutionTime limits execution time in milliseconds.
+	MaxExecutionTime int
+	// GCThreshold configures the garbage collection threshold in bytes.
+	GCThreshold int
+	// QuickJSWasmBytes supplies a pre-built QuickJS WebAssembly binary.
+	QuickJSWasmBytes []byte
+	// ProxyFunction overrides the proxy factory used to bridge Go and JS functions.
+	ProxyFunction any
+	// Stdout captures standard output from the runtime.
+	Stdout io.Writer
+	// Stderr captures standard error from the runtime.
+	Stderr io.Writer
 }
 
 // EvalOption configures JavaScript evaluation behavior in QuickJS context.
 type EvalOption struct {
-	c           *Context
-	file        string
-	code        string
-	bytecode    []byte
+	// c references the owning context used during evaluation.
+	c *Context
+	// file stores the script name for diagnostics.
+	file string
+	// code holds raw JavaScript source to execute.
+	code string
+	// bytecode contains precompiled QuickJS bytecode.
+	bytecode []byte
+	// bytecodeLen tracks the length of the bytecode buffer.
 	bytecodeLen int
-	flags       uint64
+	// flags stores the aggregated evaluation flags.
+	flags uint64
 
-	// QuickJS value handles for memory management
-	fileValue     *Value
-	codeValue     *Value
+	// fileValue retains the QuickJS handle for file names.
+	fileValue *Value
+	// codeValue retains the QuickJS handle for source code strings.
+	codeValue *Value
+	// byteCodeValue retains the QuickJS handle for bytecode buffers.
 	byteCodeValue *Value
 }
 
@@ -213,6 +233,7 @@ func (o *EvalOption) Free() {
 	}
 }
 
+// getRuntimeOption merges user-supplied options with defaults and registry hooks.
 func getRuntimeOption(registry *ProxyRegistry, options ...*Option) (option *Option, err error) {
 	if len(options) == 0 || options[0] == nil {
 		option = &Option{}

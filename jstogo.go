@@ -134,6 +134,7 @@ func JsSetToGo[T any](input *Value, samples ...T) (v T, err error) {
 	return jsSetToGoWithContext(NewTracker[uint64](), input, samples...)
 }
 
+// jsSetToGoWithContext converts a JavaScript Set using the supplied tracker.
 func jsSetToGoWithContext[T any](
 	tracker *Tracker[uint64],
 	input *Value,
@@ -151,6 +152,7 @@ func jsSetToGoWithContext[T any](
 	return jsArrayToGoWithContext(tracker, arrayVal.Value, samples...)
 }
 
+// jsArrayToGoWithContext converts a JavaScript array value with circular tracking.
 func jsArrayToGoWithContext[T any](
 	tracker *Tracker[uint64],
 	input *Value,
@@ -166,6 +168,7 @@ func jsArrayToGoWithContext[T any](
 	}).Convert()
 }
 
+// mapEntryToGoWithContext converts a single map entry to Go key/value values.
 func mapEntryToGoWithContext(
 	ctx *Tracker[uint64],
 	jsKey, jsValue *Value,
@@ -194,10 +197,12 @@ func mapEntryToGoWithContext(
 	return k, v, nil
 }
 
+// JsObjectOrMapToGoMap converts a JS object or Map into the requested Go map type.
 func JsObjectOrMapToGoMap[T any](input *Value, samples ...T) (v T, err error) {
 	return jsObjectOrMapToGoMap(NewTracker[uint64](), input, samples...)
 }
 
+// jsObjectOrMapToGoMap performs the map conversion while avoiding recursion loops.
 func jsObjectOrMapToGoMap[T any](
 	tracker *Tracker[uint64],
 	input *Value,
@@ -251,6 +256,7 @@ func jsObjectOrMapToGoMap[T any](
 	return v, err
 }
 
+// JsObjectOrMapToGoStruct converts a JS object or Map into the target Go struct type.
 func JsObjectOrMapToGoStruct[T any](
 	input *Value,
 	samples ...T,
@@ -258,6 +264,7 @@ func JsObjectOrMapToGoStruct[T any](
 	return jsObjectOrMapToGoStruct(NewTracker[uint64](), input, samples...)
 }
 
+// jsObjectOrMapToGoStruct performs the struct conversion with recursion tracking.
 func jsObjectOrMapToGoStruct[T any](
 	tracker *Tracker[uint64],
 	input *Value,
@@ -436,6 +443,7 @@ func JsObjectToGo[T any](input *Value, samples ...T) (v T, err error) {
 	return jsObjectToGo(NewTracker[uint64](), input, samples...)
 }
 
+// jsObjectToGo handles object conversion using the provided tracker instance.
 func jsObjectToGo[T any](
 	tracker *Tracker[uint64],
 	input *Value,
@@ -484,10 +492,12 @@ func jsObjectToGo[T any](
 	return processTempValue("JsObjectToGo", temp, err, sample)
 }
 
+// JsFuncToGo converts a JavaScript function into a Go callable matching the sample signature.
 func JsFuncToGo[T any](input *Value, samples ...T) (v T, err error) {
 	return jsFuncToGo(NewTracker[uint64](), input, samples...)
 }
 
+// jsFuncToGo performs the JavaScript-to-Go function conversion using shared tracker state.
 func jsFuncToGo[T any](
 	tracker *Tracker[uint64],
 	input *Value,
@@ -674,10 +684,12 @@ func handleJsFunctionResult(
 	return results
 }
 
+// JsValueToGo converts a JavaScript value to the Go type inferred from samples.
 func JsValueToGo[T any](input *Value, samples ...T) (v T, err error) {
 	return jsValueToGo(NewTracker[uint64](), input, samples...)
 }
 
+// jsValueToGo provides JsValueToGo's implementation while tracking recursion.
 func jsValueToGo[T any](
 	tracker *Tracker[uint64],
 	input *Value,

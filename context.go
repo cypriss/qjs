@@ -10,13 +10,18 @@ import (
 
 // Context represents a QuickJS execution context with associated runtime.
 type Context struct {
+	// Context carries cancellation and deadlines for QuickJS operations.
 	context.Context
 
-	handle  *Handle
+	// handle references the underlying QuickJS context handle.
+	handle *Handle
+	// runtime points to the owning runtime that backs this context.
 	runtime *Runtime
-	global  *Value
+	// global caches the global JavaScript object for repeated access.
+	global *Value
 }
 
+// Call invokes a named runtime function with the provided arguments.
 func (c *Context) Call(name string, args ...uint64) *Value {
 	return c.NewValue(c.runtime.Call(name, args...))
 }
