@@ -26,155 +26,6 @@ func TestHandle_Basic(t *testing.T) {
 	})
 }
 
-func TestHandle_BoolConversion(t *testing.T) {
-	runtime := must(qjs.New())
-	defer runtime.Close()
-
-	tests := []struct {
-		name     string
-		value    uint64
-		expected bool
-	}{
-		{"Zero", 0, false},
-		{"One", 1, true},
-		{"MaxUint64", math.MaxUint64, true},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			handle := qjs.NewHandle(runtime, test.value)
-			assert.Equal(t, test.expected, handle.Bool())
-		})
-	}
-}
-
-func TestHandle_IntegerConversions(t *testing.T) {
-	runtime := must(qjs.New())
-	defer runtime.Close()
-
-	t.Run("Int", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, 42)
-		assert.Equal(t, int(42), handle.Int())
-	})
-
-	t.Run("Int8", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, 127)
-		assert.Equal(t, int8(127), handle.Int8())
-	})
-
-	t.Run("Int16", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, 32767)
-		assert.Equal(t, int16(32767), handle.Int16())
-	})
-
-	t.Run("Int32", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, 2147483647)
-		assert.Equal(t, int32(2147483647), handle.Int32())
-	})
-
-	t.Run("Int64", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, 9223372036854775807)
-		assert.Equal(t, int64(9223372036854775807), handle.Int64())
-	})
-}
-
-func TestHandle_UintegerConversions(t *testing.T) {
-	runtime := must(qjs.New())
-	defer runtime.Close()
-
-	t.Run("Uint", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, 42)
-		assert.Equal(t, uint(42), handle.Uint())
-	})
-
-	t.Run("Uint8", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, 255)
-		assert.Equal(t, uint8(255), handle.Uint8())
-	})
-
-	t.Run("Uint16", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, 65535)
-		assert.Equal(t, uint16(65535), handle.Uint16())
-	})
-
-	t.Run("Uint32", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, 4294967295)
-		assert.Equal(t, uint32(4294967295), handle.Uint32())
-	})
-
-	t.Run("Uint64", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, 18446744073709551615)
-		assert.Equal(t, uint64(18446744073709551615), handle.Uint64())
-	})
-
-	t.Run("Uintptr", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, 42)
-		assert.Equal(t, uintptr(42), handle.Uintptr())
-	})
-}
-
-func TestHandle_FloatConversions(t *testing.T) {
-	runtime := must(qjs.New())
-	defer runtime.Close()
-
-	t.Run("Float32", func(t *testing.T) {
-		// Test IEEE 754 bit pattern interpretation for float32
-		bits := math.Float32bits(3.14159)
-		handle := qjs.NewHandle(runtime, uint64(bits))
-		assert.InDelta(t, float32(3.14159), handle.Float32(), 0.0001)
-	})
-
-	t.Run("Float64", func(t *testing.T) {
-		// Test IEEE 754 bit pattern interpretation for float64
-		bits := math.Float64bits(3.14159265359)
-		handle := qjs.NewHandle(runtime, bits)
-		assert.InDelta(t, 3.14159265359, handle.Float64(), 0.0000000001)
-	})
-}
-
-func TestHandle_String(t *testing.T) {
-	runtime := must(qjs.New())
-	defer runtime.Close()
-
-	v := runtime.Context().NewString("hello world")
-	v2 := runtime.Context().Call(
-		"QJS_ToCString",
-		runtime.Context().Raw(),
-		v.Raw(),
-	)
-
-	assert.Equal(t, "hello world", v2.Handle().String())
-}
-
-func TestHandle_Bytes(t *testing.T) {
-	runtime := must(qjs.New())
-	defer runtime.Close()
-
-	t.Run("empty_handle", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, 0)
-		bytes := handle.Bytes()
-
-		assert.Empty(t, bytes)
-		assert.Nil(t, bytes)
-	})
-
-	t.Run("non_empty_handle", func(t *testing.T) {
-		value, err := runtime.Context().Eval("test.js", qjs.Code(`({
-			hello: "hello world",
-		})`))
-		assert.NoError(t, err)
-		json := runtime.Context().Call(
-			"QJS_JSONStringify",
-			runtime.Context().Raw(),
-			value.Raw(),
-		)
-		bytes := json.Handle().Bytes()
-
-		assert.NotEmpty(t, bytes)
-		assert.JSONEq(t, `{"hello":"hello world"}`, string(bytes))
-	})
-}
-
 // Test coverage for uncovered areas in handle.go
 func TestHandle_NilChecks(t *testing.T) {
 	runtime := must(qjs.New())
@@ -228,6 +79,14 @@ func TestHandle_NilChecks(t *testing.T) {
 	})
 }
 
+func TestHandle_FreeWithNilRuntime(t *testing.T) {
+	t.Run("Free_WithNilRuntime", func(t *testing.T) {
+		handle := &qjs.Handle{} // Handle with nil runtime
+		// Should not panic
+		handle.Free()
+	})
+}
+
 func TestHandle_FreedChecks(t *testing.T) {
 	runtime := must(qjs.New())
 	defer runtime.Close()
@@ -257,40 +116,55 @@ func TestHandle_FreedChecks(t *testing.T) {
 	})
 }
 
-func TestHandle_OverflowChecks(t *testing.T) {
+func TestHandle_BoolConversion(t *testing.T) {
 	runtime := must(qjs.New())
 	defer runtime.Close()
 
-	t.Run("Uint8_Overflow", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, math.MaxUint64) // Value too large for uint8
-		assert.Panics(t, func() {
-			handle.Uint8()
-		}, "Should panic on uint8 overflow")
-	})
+	tests := []struct {
+		name     string
+		value    uint64
+		expected bool
+	}{
+		{"Zero", 0, false},
+		{"One", 1, true},
+		{"MaxUint64", math.MaxUint64, true},
+	}
 
-	t.Run("Uint16_Overflow", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, math.MaxUint64) // Value too large for uint16
-		assert.Panics(t, func() {
-			handle.Uint16()
-		}, "Should panic on uint16 overflow")
-	})
-
-	t.Run("Uint32_Overflow", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, math.MaxUint64) // Value too large for uint32
-		assert.Panics(t, func() {
-			handle.Uint32()
-		}, "Should panic on uint32 overflow")
-	})
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			handle := qjs.NewHandle(runtime, test.value)
+			assert.Equal(t, test.expected, handle.Bool())
+		})
+	}
 }
 
-func TestHandle_StringExceptionHandling(t *testing.T) {
+func TestHandle_IntegerConversions(t *testing.T) {
 	runtime := must(qjs.New())
 	defer runtime.Close()
 
-	t.Run("String_ZeroRawValue", func(t *testing.T) {
-		handle := qjs.NewHandle(runtime, 0)
-		// Should return empty string without panic when no exception
-		assert.Equal(t, "", handle.String())
+	t.Run("Int", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, 42)
+		assert.Equal(t, int(42), handle.Int())
+	})
+
+	t.Run("Int8", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, 127)
+		assert.Equal(t, int8(127), handle.Int8())
+	})
+
+	t.Run("Int16", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, 32767)
+		assert.Equal(t, int16(32767), handle.Int16())
+	})
+
+	t.Run("Int32", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, 2147483647)
+		assert.Equal(t, int32(2147483647), handle.Int32())
+	})
+
+	t.Run("Int64", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, 9223372036854775807)
+		assert.Equal(t, int64(9223372036854775807), handle.Int64())
 	})
 }
 
@@ -317,11 +191,137 @@ func TestHandle_SignExtension(t *testing.T) {
 	})
 }
 
-func TestHandle_FreeWithNilRuntime(t *testing.T) {
-	t.Run("Free_WithNilRuntime", func(t *testing.T) {
-		handle := &qjs.Handle{} // Handle with nil runtime
-		// Should not panic
-		handle.Free()
+func TestHandle_UintegerConversions(t *testing.T) {
+	runtime := must(qjs.New())
+	defer runtime.Close()
+
+	t.Run("Uint", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, 42)
+		assert.Equal(t, uint(42), handle.Uint())
+	})
+
+	t.Run("Uint8", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, 255)
+		assert.Equal(t, uint8(255), handle.Uint8())
+	})
+
+	t.Run("Uint16", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, 65535)
+		assert.Equal(t, uint16(65535), handle.Uint16())
+	})
+
+	t.Run("Uint32", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, 4294967295)
+		assert.Equal(t, uint32(4294967295), handle.Uint32())
+	})
+
+	t.Run("Uint64", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, 18446744073709551615)
+		assert.Equal(t, uint64(18446744073709551615), handle.Uint64())
+	})
+
+	t.Run("Uintptr", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, 42)
+		assert.Equal(t, uintptr(42), handle.Uintptr())
+	})
+}
+
+func TestHandle_OverflowChecks(t *testing.T) {
+	runtime := must(qjs.New())
+	defer runtime.Close()
+
+	t.Run("Uint8_Overflow", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, math.MaxUint64) // Value too large for uint8
+		assert.Panics(t, func() {
+			handle.Uint8()
+		}, "Should panic on uint8 overflow")
+	})
+
+	t.Run("Uint16_Overflow", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, math.MaxUint64) // Value too large for uint16
+		assert.Panics(t, func() {
+			handle.Uint16()
+		}, "Should panic on uint16 overflow")
+	})
+
+	t.Run("Uint32_Overflow", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, math.MaxUint64) // Value too large for uint32
+		assert.Panics(t, func() {
+			handle.Uint32()
+		}, "Should panic on uint32 overflow")
+	})
+}
+
+func TestHandle_FloatConversions(t *testing.T) {
+	runtime := must(qjs.New())
+	defer runtime.Close()
+
+	t.Run("Float32", func(t *testing.T) {
+		// Test IEEE 754 bit pattern interpretation for float32
+		bits := math.Float32bits(3.14159)
+		handle := qjs.NewHandle(runtime, uint64(bits))
+		assert.InDelta(t, float32(3.14159), handle.Float32(), 0.0001)
+	})
+
+	t.Run("Float64", func(t *testing.T) {
+		// Test IEEE 754 bit pattern interpretation for float64
+		bits := math.Float64bits(3.14159265359)
+		handle := qjs.NewHandle(runtime, bits)
+		assert.InDelta(t, 3.14159265359, handle.Float64(), 0.0000000001)
+	})
+}
+
+func TestHandle_String(t *testing.T) {
+	runtime := must(qjs.New())
+	defer runtime.Close()
+
+	v := runtime.Context().NewString("hello world")
+	v2 := runtime.Context().Call(
+		"QJS_ToCString",
+		runtime.Context().Raw(),
+		v.Raw(),
+	)
+
+	assert.Equal(t, "hello world", v2.Handle().String())
+}
+
+func TestHandle_StringExceptionHandling(t *testing.T) {
+	runtime := must(qjs.New())
+	defer runtime.Close()
+
+	t.Run("String_ZeroRawValue", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, 0)
+		// Should return empty string without panic when no exception
+		assert.Equal(t, "", handle.String())
+	})
+}
+
+func TestHandle_Bytes(t *testing.T) {
+	runtime := must(qjs.New())
+	defer runtime.Close()
+
+	t.Run("empty_handle", func(t *testing.T) {
+		handle := qjs.NewHandle(runtime, 0)
+		bytes := handle.Bytes()
+
+		assert.Empty(t, bytes)
+		assert.Nil(t, bytes)
+	})
+
+	t.Run("non_empty_handle", func(t *testing.T) {
+		value, err := runtime.Context().Eval("test.js", qjs.Code(`({
+			hello: "hello world",
+		})`))
+		assert.NoError(t, err)
+		json := runtime.Context().Call(
+			"QJS_JSONStringify",
+			runtime.Context().Raw(),
+			value.Raw(),
+		)
+		bytes := json.Handle().Bytes()
+
+		assert.NotEmpty(t, bytes)
+		assert.JSONEq(t, `{"hello":"hello world"}`, string(bytes))
 	})
 }
 

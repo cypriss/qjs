@@ -12,121 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func testConcurrentRuntimeExecution(t *testing.T, threadID int) {
-	rt, err := qjs.New()
-	require.NoError(t, err)
-	defer rt.Close()
-
-	threadName := fmt.Sprintf("thread%d", threadID)
-	result, err := rt.Context().Eval(
-		"test.js",
-		qjs.Code(fmt.Sprintf("console.log('Hello from %s');", threadName)),
-	)
-	assert.NoError(t, err)
-	if result != nil {
-		result.Free()
-	}
-
-	// Test struct conversion in concurrent context
-	type TestData struct {
-		ThreadID int
-		Name     string
-	}
-
-	data := TestData{
-		ThreadID: threadID,
-		Name:     threadName,
-	}
-
-	jsValue, err := qjs.ToJSValue(rt.Context(), data)
-	assert.NoError(t, err)
-	if jsValue != nil {
-		assert.True(t, jsValue.IsObject())
-		assert.Equal(t, int32(threadID), jsValue.GetPropertyStr("ThreadID").Int32())
-		assert.Equal(t, threadName, jsValue.GetPropertyStr("Name").String())
-		jsValue.Free()
-	}
-
-	// Test call QJS_Panic
-	assert.Panics(t, func() {
-		rt.Call("QJS_Panic")
-	})
-}
-
-func createTestPoolWithSetup() *qjs.Pool {
-	return qjs.NewPool(10, &qjs.Option{
-		MaxStackSize: 1024 * 1024 * 10,
-	}, func(rt *qjs.Runtime) error {
-		_, err := rt.Context().Eval(
-			"pool-init.js",
-			qjs.Code("globalThis.poolInitialized = true;"),
-		)
-		return err
-	})
-}
-
-func testPooledRuntimeExecution(t *testing.T, pool *qjs.Pool, workerID int) {
-	rt, err := pool.Get()
-	require.NoError(t, err)
-	defer pool.Put(rt)
-
-	// Verify pool initialization
-	result, err := rt.Context().Eval("check.js", qjs.Code("globalThis.poolInitialized"))
-	require.NoError(t, err)
-	defer result.Free()
-	assert.True(t, result.Bool())
-
-	// Test conversion in pooled runtime
-	testData := map[string]any{
-		"workerID":  workerID,
-		"timestamp": time.Now().Unix(),
-		"processed": true,
-	}
-
-	jsValue, err := qjs.ToJSValue(rt.Context(), testData)
-	require.NoError(t, err)
-	defer jsValue.Free()
-
-	assert.True(t, jsValue.IsObject())
-	assert.Equal(t, int32(workerID), jsValue.GetPropertyStr("workerID").Int32())
-	assert.True(t, jsValue.GetPropertyStr("processed").Bool())
-}
-
-func createTestPool(size int, setupFuncs ...func(*qjs.Runtime) error) *qjs.Pool {
-	return qjs.NewPool(size, nil, setupFuncs...)
-}
-
-func verifyRuntimeExecution(t *testing.T, rt *qjs.Runtime, code string, expected any) {
-	t.Helper()
-	val, err := rt.Eval("test.js", qjs.Code(code))
-	assert.NoError(t, err)
-	defer val.Free()
-
-	switch exp := expected.(type) {
-	case int32:
-		assert.Equal(t, exp, val.Int32())
-	case string:
-		assert.Equal(t, exp, val.String())
-	default:
-		t.Fatalf("Unsupported expected type: %T", expected)
-	}
-}
-
-func createSetupFunction(globalVar, value string, shouldError bool, customError error) func(*qjs.Runtime) error {
-	return func(rt *qjs.Runtime) error {
-		if shouldError {
-			if customError != nil {
-				return customError
-			}
-			return fmt.Errorf("setup error")
-		}
-
-		code := fmt.Sprintf("globalThis.%s = '%s'", globalVar, value)
-		_, err := rt.Eval("setup.js", qjs.Code(code))
-		return err
-	}
-}
-
 func TestRuntime(t *testing.T) {
 	t.Run("RuntimeCreation", func(t *testing.T) {
 		rt, _ := setupTestContext(t)
@@ -253,38 +138,6 @@ func TestRuntime(t *testing.T) {
 		rt2, err := qjs.New()
 		require.NoError(t, err, "Normal runtime creation should still work after invalid attempt")
 		defer rt2.Close()
-	})
-}
-
-// Concurrent Runtime Usage Tests
-func TestConcurrentRuntimeUsage(t *testing.T) {
-	t.Run("MultipleIndependentRuntimes", func(t *testing.T) {
-		const numThreads = 10
-		var wg sync.WaitGroup
-
-		for i := 0; i < numThreads; i++ {
-			wg.Add(1)
-			go func(threadID int) {
-				defer wg.Done()
-				testConcurrentRuntimeExecution(t, threadID)
-			}(i)
-		}
-		wg.Wait()
-	})
-
-	t.Run("RuntimePoolUsage", func(t *testing.T) {
-		pool := createTestPoolWithSetup()
-		const numWorkers = 20
-		var wg sync.WaitGroup
-
-		for i := range numWorkers {
-			wg.Add(1)
-			go func(workerID int) {
-				defer wg.Done()
-				testPooledRuntimeExecution(t, pool, workerID)
-			}(i)
-		}
-		wg.Wait()
 	})
 }
 
@@ -548,4 +401,151 @@ func TestPoolConcurrentAccess(t *testing.T) {
 
 		assert.Equal(t, numThreads, successCount, "All goroutines should complete successfully")
 	})
+}
+
+// Concurrent Runtime Usage Tests
+func TestConcurrentRuntimeUsage(t *testing.T) {
+	t.Run("MultipleIndependentRuntimes", func(t *testing.T) {
+		const numThreads = 10
+		var wg sync.WaitGroup
+
+		for i := 0; i < numThreads; i++ {
+			wg.Add(1)
+			go func(threadID int) {
+				defer wg.Done()
+				testConcurrentRuntimeExecution(t, threadID)
+			}(i)
+		}
+		wg.Wait()
+	})
+
+	t.Run("RuntimePoolUsage", func(t *testing.T) {
+		pool := createTestPoolWithSetup()
+		const numWorkers = 20
+		var wg sync.WaitGroup
+
+		for i := range numWorkers {
+			wg.Add(1)
+			go func(workerID int) {
+				defer wg.Done()
+				testPooledRuntimeExecution(t, pool, workerID)
+			}(i)
+		}
+		wg.Wait()
+	})
+}
+
+func createTestPool(size int, setupFuncs ...func(*qjs.Runtime) error) *qjs.Pool {
+	return qjs.NewPool(size, nil, setupFuncs...)
+}
+
+func createTestPoolWithSetup() *qjs.Pool {
+	return qjs.NewPool(10, &qjs.Option{
+		MaxStackSize: 1024 * 1024 * 10,
+	}, func(rt *qjs.Runtime) error {
+		_, err := rt.Context().Eval(
+			"pool-init.js",
+			qjs.Code("globalThis.poolInitialized = true;"),
+		)
+		return err
+	})
+}
+
+func createSetupFunction(globalVar, value string, shouldError bool, customError error) func(*qjs.Runtime) error {
+	return func(rt *qjs.Runtime) error {
+		if shouldError {
+			if customError != nil {
+				return customError
+			}
+			return fmt.Errorf("setup error")
+		}
+
+		code := fmt.Sprintf("globalThis.%s = '%s'", globalVar, value)
+		_, err := rt.Eval("setup.js", qjs.Code(code))
+		return err
+	}
+}
+
+func verifyRuntimeExecution(t *testing.T, rt *qjs.Runtime, code string, expected any) {
+	t.Helper()
+	val, err := rt.Eval("test.js", qjs.Code(code))
+	assert.NoError(t, err)
+	defer val.Free()
+
+	switch exp := expected.(type) {
+	case int32:
+		assert.Equal(t, exp, val.Int32())
+	case string:
+		assert.Equal(t, exp, val.String())
+	default:
+		t.Fatalf("Unsupported expected type: %T", expected)
+	}
+}
+
+func testConcurrentRuntimeExecution(t *testing.T, threadID int) {
+	rt, err := qjs.New()
+	require.NoError(t, err)
+	defer rt.Close()
+
+	threadName := fmt.Sprintf("thread%d", threadID)
+	result, err := rt.Context().Eval(
+		"test.js",
+		qjs.Code(fmt.Sprintf("console.log('Hello from %s');", threadName)),
+	)
+	assert.NoError(t, err)
+	if result != nil {
+		result.Free()
+	}
+
+	// Test struct conversion in concurrent context
+	type TestData struct {
+		ThreadID int
+		Name     string
+	}
+
+	data := TestData{
+		ThreadID: threadID,
+		Name:     threadName,
+	}
+
+	jsValue, err := qjs.ToJSValue(rt.Context(), data)
+	assert.NoError(t, err)
+	if jsValue != nil {
+		assert.True(t, jsValue.IsObject())
+		assert.Equal(t, int32(threadID), jsValue.GetPropertyStr("ThreadID").Int32())
+		assert.Equal(t, threadName, jsValue.GetPropertyStr("Name").String())
+		jsValue.Free()
+	}
+
+	// Test call QJS_Panic
+	assert.Panics(t, func() {
+		rt.Call("QJS_Panic")
+	})
+}
+
+func testPooledRuntimeExecution(t *testing.T, pool *qjs.Pool, workerID int) {
+	rt, err := pool.Get()
+	require.NoError(t, err)
+	defer pool.Put(rt)
+
+	// Verify pool initialization
+	result, err := rt.Context().Eval("check.js", qjs.Code("globalThis.poolInitialized"))
+	require.NoError(t, err)
+	defer result.Free()
+	assert.True(t, result.Bool())
+
+	// Test conversion in pooled runtime
+	testData := map[string]any{
+		"workerID":  workerID,
+		"timestamp": time.Now().Unix(),
+		"processed": true,
+	}
+
+	jsValue, err := qjs.ToJSValue(rt.Context(), testData)
+	require.NoError(t, err)
+	defer jsValue.Free()
+
+	assert.True(t, jsValue.IsObject())
+	assert.Equal(t, int32(workerID), jsValue.GetPropertyStr("workerID").Int32())
+	assert.True(t, jsValue.GetPropertyStr("processed").Bool())
 }

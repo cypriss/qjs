@@ -6,6 +6,23 @@ import (
 	"sync/atomic"
 )
 
+// Signed integer conversion methods with bounds checking.
+type Signed interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64
+}
+
+type Unsigned interface {
+	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr
+}
+
+type Integer interface {
+	Signed | Unsigned
+}
+
+type Float interface {
+	~float32 | ~float64
+}
+
 // Handle represents a reference to a QuickJS value. It manages raw pointer values from WebAssembly
 // memory and provides safe type conversion methods with proper resource management.
 type Handle struct {
@@ -26,59 +43,6 @@ func NewHandle(runtime *Runtime, ptr uint64) *Handle {
 		runtime: runtime,
 		freed:   0,
 	}
-}
-
-// Free releases the memory associated with this handle. Only used with C values such as: QJS_ToCString,
-// QJS_JSONStringify. Do not use this method for JsValue.
-func (h *Handle) Free() {
-	if h == nil || h.runtime == nil {
-		return
-	}
-
-	// Use atomic compare-and-swap to ensure single free
-	if atomic.CompareAndSwapInt32(&h.freed, 0, 1) && h.raw != 0 {
-		h.runtime.FreeHandle(h.raw)
-	}
-}
-
-// IsFreed returns true if the handle has been freed.
-func (h *Handle) IsFreed() bool {
-	return h == nil || atomic.LoadInt32(&h.freed) != 0
-}
-
-// Raw returns the underlying raw pointer or 0 if the handle is nil or freed.
-func (h *Handle) Raw() uint64 {
-	if h == nil || h.IsFreed() {
-		return 0
-	}
-
-	return h.raw
-}
-
-// Bool converts the handle value to bool using zero/non-zero semantics.
-func (h *Handle) Bool() bool {
-	if h == nil || h.IsFreed() {
-		return false
-	}
-
-	return int32(h.raw) != 0
-}
-
-// Signed integer conversion methods with bounds checking.
-type Signed interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64
-}
-
-type Unsigned interface {
-	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr
-}
-
-type Integer interface {
-	Signed | Unsigned
-}
-
-type Float interface {
-	~float32 | ~float64
 }
 
 // ConvertToSigned performs safe conversion to signed integer types with bounds checking.
@@ -140,16 +104,44 @@ func ConvertToUnsigned[T Unsigned](h *Handle) T {
 	return result
 }
 
-func (h *Handle) Int() int         { return ConvertToSigned[int](h) }
-func (h *Handle) Int8() int8       { return ConvertToSigned[int8](h) }
-func (h *Handle) Int16() int16     { return ConvertToSigned[int16](h) }
-func (h *Handle) Int32() int32     { return ConvertToSigned[int32](h) }
-func (h *Handle) Int64() int64     { return ConvertToSigned[int64](h) }
-func (h *Handle) Uint() uint       { return ConvertToUnsigned[uint](h) }
-func (h *Handle) Uint8() uint8     { return ConvertToUnsigned[uint8](h) }
-func (h *Handle) Uint16() uint16   { return ConvertToUnsigned[uint16](h) }
-func (h *Handle) Uint32() uint32   { return ConvertToUnsigned[uint32](h) }
-func (h *Handle) Uint64() uint64   { return ConvertToUnsigned[uint64](h) }
+// Raw returns the underlying raw pointer or 0 if the handle is nil or freed.
+func (h *Handle) Raw() uint64 {
+	if h == nil || h.IsFreed() {
+		return 0
+	}
+
+	return h.raw
+}
+
+// Bool converts the handle value to bool using zero/non-zero semantics.
+func (h *Handle) Bool() bool {
+	if h == nil || h.IsFreed() {
+		return false
+	}
+
+	return int32(h.raw) != 0
+}
+
+func (h *Handle) Int() int { return ConvertToSigned[int](h) }
+
+func (h *Handle) Int8() int8 { return ConvertToSigned[int8](h) }
+
+func (h *Handle) Int16() int16 { return ConvertToSigned[int16](h) }
+
+func (h *Handle) Int32() int32 { return ConvertToSigned[int32](h) }
+
+func (h *Handle) Int64() int64 { return ConvertToSigned[int64](h) }
+
+func (h *Handle) Uint() uint { return ConvertToUnsigned[uint](h) }
+
+func (h *Handle) Uint8() uint8 { return ConvertToUnsigned[uint8](h) }
+
+func (h *Handle) Uint16() uint16 { return ConvertToUnsigned[uint16](h) }
+
+func (h *Handle) Uint32() uint32 { return ConvertToUnsigned[uint32](h) }
+
+func (h *Handle) Uint64() uint64 { return ConvertToUnsigned[uint64](h) }
+
 func (h *Handle) Uintptr() uintptr { return ConvertToUnsigned[uintptr](h) }
 
 // Float32 converts the handle value to float32 by interpreting the lower 32 bits as IEEE 754
@@ -216,4 +208,22 @@ func (h *Handle) Bytes() []byte {
 	copy(result, data)
 
 	return result
+}
+
+// IsFreed returns true if the handle has been freed.
+func (h *Handle) IsFreed() bool {
+	return h == nil || atomic.LoadInt32(&h.freed) != 0
+}
+
+// Free releases the memory associated with this handle. Only used with C values such as: QJS_ToCString,
+// QJS_JSONStringify. Do not use this method for JsValue.
+func (h *Handle) Free() {
+	if h == nil || h.runtime == nil {
+		return
+	}
+
+	// Use atomic compare-and-swap to ensure single free
+	if atomic.CompareAndSwapInt32(&h.freed, 0, 1) && h.raw != 0 {
+		h.runtime.FreeHandle(h.raw)
+	}
 }

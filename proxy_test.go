@@ -129,6 +129,32 @@ func TestBasicFunctionCalls(t *testing.T) {
 	}
 }
 
+// TestFunctionWithDifferentArgTypes maintains original test compatibility
+func TestFunctionWithDifferentArgTypes(t *testing.T) {
+	runtime := setupProxyTestRuntime(t)
+
+	runtime.Context().SetFunc("concat", func(this *qjs.This) (*qjs.Value, error) {
+		if len(this.Args()) != 2 {
+			return this.NewUndefined(), errors.New("concat requires 2 arguments")
+		}
+
+		str := this.Args()[0].String()
+		num := this.Args()[1].Int32()
+		result := fmt.Sprintf("%s-%d", str, num)
+
+		return this.Context().NewString(result), nil
+	})
+
+	val, err := runtime.Eval("test.js", qjs.Code(`
+        const result = concat("test", 42);
+        result;
+    `))
+	defer val.Free()
+
+	require.NoError(t, err)
+	assert.Equal(t, "test-42", val.String())
+}
+
 // TestArgumentValidation tests function argument validation and type checking
 func TestArgumentValidation(t *testing.T) {
 	runtime := setupProxyTestRuntime(t)
@@ -465,6 +491,26 @@ func TestPanicRecovery(t *testing.T) {
 	})
 }
 
+// TestPanicHandling maintains original test compatibility
+func TestPanicHandling(t *testing.T) {
+	runtime := setupProxyTestRuntime(t)
+
+	runtime.Context().SetFunc("panicFunction", func(this *qjs.This) (*qjs.Value, error) {
+		panic("this function panics")
+	})
+
+	_, err := runtime.Eval("test.js", qjs.Code(`
+			try {
+					panicFunction();
+			} catch (e) {
+					throw new Error("Caught: " + e.message);
+			}
+	`))
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "this function panics")
+}
+
 // TestAsyncFunctions tests asynchronous function handling
 func TestAsyncFunctions(t *testing.T) {
 	runtime := setupProxyTestRuntime(t)
@@ -628,6 +674,32 @@ func TestThisContext(t *testing.T) {
 	})
 }
 
+// TestFunctionWithThis maintains original test compatibility
+func TestFunctionWithThis(t *testing.T) {
+	runtime := setupProxyTestRuntime(t)
+
+	// Function that uses the "this" value
+	runtime.Context().SetFunc("getThisProperty", func(this *qjs.This) (*qjs.Value, error) {
+		thisValue := this.Value
+		if !thisValue.IsObject() {
+			return this.NewUndefined(), errors.New("'this' is not an object")
+		}
+
+		prop := thisValue.GetPropertyStr("name")
+		return prop, nil
+	})
+
+	val, err := runtime.Eval("test.js", qjs.Code(`
+        const obj = { name: "test object" };
+        const result = getThisProperty.call(obj);
+        result;
+    `))
+	defer val.Free()
+
+	require.NoError(t, err)
+	assert.Equal(t, "test object", val.String())
+}
+
 // TestMultipleFunctionInteraction tests interaction between multiple registered functions
 func TestMultipleFunctionInteraction(t *testing.T) {
 	runtime := setupProxyTestRuntime(t)
@@ -688,6 +760,47 @@ func TestMultipleFunctionInteraction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "persistent value", val.String())
 	})
+}
+
+// TestMultipleFunctions maintains original test compatibility
+func TestMultipleFunctions(t *testing.T) {
+	runtime := setupProxyTestRuntime(t)
+
+	runtime.Context().SetFunc(
+		"setGlobalValue",
+		func(this *qjs.This) (*qjs.Value, error) {
+			if len(this.Args()) != 1 {
+				return this.NewUndefined(), errors.New("requires 1 argument")
+			}
+
+			value := this.Args()[0]
+			global := this.Context().Global()
+			global.SetPropertyStr("testValue", value)
+
+			return this.NewUndefined(), nil
+		},
+	)
+
+	runtime.Context().SetFunc(
+		"getGlobalValue",
+		func(this *qjs.This) (*qjs.Value, error) {
+			global := this.Context().Global()
+			return global.GetPropertyStr("testValue"), nil
+		},
+	)
+
+	_, err := runtime.Eval("test.js", qjs.Code(`
+		setGlobalValue("global test value");
+	`))
+	require.NoError(t, err)
+
+	val, err := runtime.Eval("test.js", qjs.Code(`
+		getGlobalValue();
+	`))
+	defer val.Free()
+
+	require.NoError(t, err)
+	assert.Equal(t, "global test value", val.String())
 }
 
 // TestProxyRegistryOperations tests the improved ProxyRegistry functionality
@@ -775,117 +888,4 @@ func TestProxyRegistryOperations(t *testing.T) {
 		registry.Clear()
 		assert.Equal(t, 0, registry.Len())
 	})
-}
-
-// TestFunctionWithDifferentArgTypes maintains original test compatibility
-func TestFunctionWithDifferentArgTypes(t *testing.T) {
-	runtime := setupProxyTestRuntime(t)
-
-	runtime.Context().SetFunc("concat", func(this *qjs.This) (*qjs.Value, error) {
-		if len(this.Args()) != 2 {
-			return this.NewUndefined(), errors.New("concat requires 2 arguments")
-		}
-
-		str := this.Args()[0].String()
-		num := this.Args()[1].Int32()
-		result := fmt.Sprintf("%s-%d", str, num)
-
-		return this.Context().NewString(result), nil
-	})
-
-	val, err := runtime.Eval("test.js", qjs.Code(`
-        const result = concat("test", 42);
-        result;
-    `))
-	defer val.Free()
-
-	require.NoError(t, err)
-	assert.Equal(t, "test-42", val.String())
-}
-
-// TestFunctionWithThis maintains original test compatibility
-func TestFunctionWithThis(t *testing.T) {
-	runtime := setupProxyTestRuntime(t)
-
-	// Function that uses the "this" value
-	runtime.Context().SetFunc("getThisProperty", func(this *qjs.This) (*qjs.Value, error) {
-		thisValue := this.Value
-		if !thisValue.IsObject() {
-			return this.NewUndefined(), errors.New("'this' is not an object")
-		}
-
-		prop := thisValue.GetPropertyStr("name")
-		return prop, nil
-	})
-
-	val, err := runtime.Eval("test.js", qjs.Code(`
-        const obj = { name: "test object" };
-        const result = getThisProperty.call(obj);
-        result;
-    `))
-	defer val.Free()
-
-	require.NoError(t, err)
-	assert.Equal(t, "test object", val.String())
-}
-
-// TestPanicHandling maintains original test compatibility
-func TestPanicHandling(t *testing.T) {
-	runtime := setupProxyTestRuntime(t)
-
-	runtime.Context().SetFunc("panicFunction", func(this *qjs.This) (*qjs.Value, error) {
-		panic("this function panics")
-	})
-
-	_, err := runtime.Eval("test.js", qjs.Code(`
-			try {
-					panicFunction();
-			} catch (e) {
-					throw new Error("Caught: " + e.message);
-			}
-	`))
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "this function panics")
-}
-
-// TestMultipleFunctions maintains original test compatibility
-func TestMultipleFunctions(t *testing.T) {
-	runtime := setupProxyTestRuntime(t)
-
-	runtime.Context().SetFunc(
-		"setGlobalValue",
-		func(this *qjs.This) (*qjs.Value, error) {
-			if len(this.Args()) != 1 {
-				return this.NewUndefined(), errors.New("requires 1 argument")
-			}
-
-			value := this.Args()[0]
-			global := this.Context().Global()
-			global.SetPropertyStr("testValue", value)
-
-			return this.NewUndefined(), nil
-		},
-	)
-
-	runtime.Context().SetFunc(
-		"getGlobalValue",
-		func(this *qjs.This) (*qjs.Value, error) {
-			global := this.Context().Global()
-			return global.GetPropertyStr("testValue"), nil
-		},
-	)
-
-	_, err := runtime.Eval("test.js", qjs.Code(`
-		setGlobalValue("global test value");
-	`))
-	require.NoError(t, err)
-
-	val, err := runtime.Eval("test.js", qjs.Code(`
-		getGlobalValue();
-	`))
-	defer val.Free()
-
-	require.NoError(t, err)
-	assert.Equal(t, "global test value", val.String())
 }

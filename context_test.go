@@ -11,6 +11,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Helper structure for function test cases
+type functionTestCase struct {
+	name              string
+	fn                qjs.Function
+	asyncFn           qjs.AsyncFunction
+	code              string
+	expectErrorString string
+	expectError       func(*testing.T, error)
+	expectValue       func(*testing.T, *qjs.Value)
+}
+
 // Basic Properties Tests
 func TestContextBasicProperties(t *testing.T) {
 	_, ctx := setupRuntime(t)
@@ -168,6 +179,32 @@ func TestContextValueCreation(t *testing.T) {
 		assert.True(t, val.IsDate())
 		// Compare milliseconds due to JavaScript Date precision
 		assert.Equal(t, tm.UnixNano()/1e6, val.DateTime().UnixNano()/1e6)
+	})
+}
+
+// Atoms Tests
+func TestContextAtoms(t *testing.T) {
+	_, ctx := setupRuntime(t)
+
+	t.Run("atom_from_string", func(t *testing.T) {
+		atom := ctx.NewAtom("test")
+		defer atom.Free()
+
+		str := atom.String()
+		assert.Equal(t, "test", str)
+
+		val := atom.ToValue()
+		defer val.Free()
+		assert.Equal(t, "test", val.String())
+	})
+
+	t.Run("atom_from_index", func(t *testing.T) {
+		atom := ctx.NewAtomIndex(42)
+		defer atom.Free()
+
+		val := atom.ToValue()
+		defer val.Free()
+		assert.NotEmpty(t, val.String())
 	})
 }
 
@@ -334,17 +371,6 @@ func TestContextFunctionBinding(t *testing.T) {
 	})
 }
 
-// Helper structure for function test cases
-type functionTestCase struct {
-	name              string
-	fn                qjs.Function
-	asyncFn           qjs.AsyncFunction
-	code              string
-	expectErrorString string
-	expectError       func(*testing.T, error)
-	expectValue       func(*testing.T, *qjs.Value)
-}
-
 // Synchronous Functions Tests
 func testSynchronousFunctions(t *testing.T) {
 	t.Run("basic_function_registration", func(t *testing.T) {
@@ -413,32 +439,6 @@ func testAsynchronousFunctions(t *testing.T) {
 	t.Run("async_argument_handling", func(t *testing.T) {
 		tests := createAsyncArgumentHandlingTests()
 		runFunctionTests(t, tests, true)
-	})
-}
-
-// Atoms Tests
-func TestContextAtoms(t *testing.T) {
-	_, ctx := setupRuntime(t)
-
-	t.Run("atom_from_string", func(t *testing.T) {
-		atom := ctx.NewAtom("test")
-		defer atom.Free()
-
-		str := atom.String()
-		assert.Equal(t, "test", str)
-
-		val := atom.ToValue()
-		defer val.Free()
-		assert.Equal(t, "test", val.String())
-	})
-
-	t.Run("atom_from_index", func(t *testing.T) {
-		atom := ctx.NewAtomIndex(42)
-		defer atom.Free()
-
-		val := atom.ToValue()
-		defer val.Free()
-		assert.NotEmpty(t, val.String())
 	})
 }
 

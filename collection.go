@@ -16,14 +16,6 @@ func NewArray(value *Value) *Array {
 	return &Array{Value: value}
 }
 
-func (a *Array) ForEach(forFn func(key, value *Value)) {
-	if a == nil || a.Value == nil || forFn == nil {
-		return
-	}
-
-	a.Value.ForEach(forFn)
-}
-
 // HasIndex returns true if the given index exists in the array.
 func (a *Array) HasIndex(i int64) bool {
 	return a.HasPropertyIndex(i)
@@ -38,6 +30,15 @@ func (a *Array) Get(index int64) *Value {
 	return a.GetPropertyIndex(index)
 }
 
+// Set updates the element at the given index.
+func (a *Array) Set(index int64, value *Value) {
+	if a == nil || a.Value == nil {
+		return
+	}
+
+	a.SetPropertyIndex(index, value)
+}
+
 // Push appends elements to the array and returns the new length.
 func (a *Array) Push(elements ...*Value) int64 {
 	ret, err := a.InvokeJS("push", elements...)
@@ -48,15 +49,6 @@ func (a *Array) Push(elements ...*Value) int64 {
 	defer ret.Free()
 
 	return ret.Int64()
-}
-
-// Set updates the element at the given index.
-func (a *Array) Set(index int64, value *Value) {
-	if a == nil || a.Value == nil {
-		return
-	}
-
-	a.SetPropertyIndex(index, value)
 }
 
 // Delete removes the element at the given index.
@@ -81,6 +73,14 @@ func (a *Array) Delete(index int64) bool {
 	return removeList.IsArray() && removeList.Len() > 0
 }
 
+func (a *Array) ForEach(forFn func(key, value *Value)) {
+	if a == nil || a.Value == nil || forFn == nil {
+		return
+	}
+
+	a.Value.ForEach(forFn)
+}
+
 // Map provides a wrapper around JavaScript Map objects with Go-like methods.
 type Map struct {
 	*Value
@@ -93,29 +93,6 @@ func NewMap(value *Value) *Map {
 	}
 
 	return &Map{Value: value}
-}
-
-// JSONStringify returns the JSON representation of the Map as an object.
-func (m *Map) JSONStringify() (string, error) {
-	object := m.CreateObject()
-	defer object.Free()
-
-	return object.JSONStringify()
-}
-
-// IsMap returns true if this is a valid Map. Mainly used to satisfy ObjectOrMap.
-func (m *Map) IsMap() bool {
-	return m != nil && m.Value != nil
-}
-
-// IsObject returns true if this is a valid Map, mainly used to satisfy ObjectOrMap.
-func (m *Map) IsObject() bool {
-	return m != nil && m.Value != nil
-}
-
-// ToMap returns this Map instance, mainly used to satisfy ObjectOrMap.
-func (m *Map) ToMap() *Map {
-	return m
 }
 
 // Get retrieves the value for the given key.
@@ -214,6 +191,29 @@ func (m *Map) CreateObject() *Value {
 	return object
 }
 
+// JSONStringify returns the JSON representation of the Map as an object.
+func (m *Map) JSONStringify() (string, error) {
+	object := m.CreateObject()
+	defer object.Free()
+
+	return object.JSONStringify()
+}
+
+// IsMap returns true if this is a valid Map. Mainly used to satisfy ObjectOrMap.
+func (m *Map) IsMap() bool {
+	return m != nil && m.Value != nil
+}
+
+// IsObject returns true if this is a valid Map, mainly used to satisfy ObjectOrMap.
+func (m *Map) IsObject() bool {
+	return m != nil && m.Value != nil
+}
+
+// ToMap returns this Map instance, mainly used to satisfy ObjectOrMap.
+func (m *Map) ToMap() *Map {
+	return m
+}
+
 // Set provides a wrapper around JavaScript Set objects with Go-like methods.
 type Set struct {
 	*Value
@@ -226,15 +226,6 @@ func NewSet(value *Value) *Set {
 	}
 
 	return &Set{Value: value}
-}
-
-// JSONStringify returns the JSON representation of the Set as an array.
-func (s *Set) JSONStringify() (string, error) {
-	arr := s.ToArray()
-
-	defer arr.Free()
-
-	return arr.JSONStringify()
 }
 
 // Add adds a value to the Set.
@@ -281,20 +272,6 @@ func (s *Set) Has(value *Value) bool {
 	return v.Bool()
 }
 
-// ToArray converts the Set to an Array.
-func (s *Set) ToArray() *Array {
-	if s == nil || s.Value == nil {
-		return nil
-	}
-
-	array := s.context.NewArray()
-	s.ForEach(func(value *Value) {
-		array.Push(value.Clone())
-	})
-
-	return array
-}
-
 // ForEach calls forFn for each value.
 func (s *Set) ForEach(forFn func(value *Value)) {
 	if s == nil || s.Value == nil || forFn == nil {
@@ -317,4 +294,27 @@ func (s *Set) ForEach(forFn func(value *Value)) {
 	}
 
 	defer value.Free()
+}
+
+// ToArray converts the Set to an Array.
+func (s *Set) ToArray() *Array {
+	if s == nil || s.Value == nil {
+		return nil
+	}
+
+	array := s.context.NewArray()
+	s.ForEach(func(value *Value) {
+		array.Push(value.Clone())
+	})
+
+	return array
+}
+
+// JSONStringify returns the JSON representation of the Set as an array.
+func (s *Set) JSONStringify() (string, error) {
+	arr := s.ToArray()
+
+	defer arr.Free()
+
+	return arr.JSONStringify()
 }

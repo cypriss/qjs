@@ -51,12 +51,12 @@ func combineErrors(errs ...error) error {
 	return errors.New(errStr)
 }
 
-func newMaxLengthExceededErr(request uint, maxLen int64, index int) error {
-	return fmt.Errorf("length %d exceeds max %d at index %d", request, maxLen, index)
-}
-
 func newOverflowErr(value any, targetType string) error {
 	return fmt.Errorf("value %v overflows %s", value, targetType)
+}
+
+func newMaxLengthExceededErr(request uint, maxLen int64, index int) error {
+	return fmt.Errorf("length %d exceeds max %d at index %d", request, maxLen, index)
 }
 
 func newGoToJsErr(kind string, err error, details ...string) error {
@@ -104,10 +104,6 @@ func newJsToGoErr(kind *Value, err error, details ...string) error {
 	return fmt.Errorf("cannot convert JS%s%s to Go: %w", detail, kindStr, err)
 }
 
-func newArgConversionErr(index int, err error) error {
-	return fmt.Errorf("cannot convert JS function argument at index %d: %w", index, err)
-}
-
 func newInvalidGoTargetErr(expect string, got any) error {
 	return fmt.Errorf("expected GO target %s, got %T", expect, got)
 }
@@ -123,6 +119,10 @@ func newInvalidJsInputErr(kind string, input *Value) (err error) {
 
 func newJsStringifyErr(kind string, err error) error {
 	return fmt.Errorf("js %s: %w", kind, err)
+}
+
+func newArgConversionErr(index int, err error) error {
+	return fmt.Errorf("cannot convert JS function argument at index %d: %w", index, err)
 }
 
 func newProxyErr(id uint64, r any) error {

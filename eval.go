@@ -1,23 +1,5 @@
 package qjs
 
-func load(c *Context, file string, flags ...EvalOptionFunc) (*Value, error) {
-	if file == "" {
-		return nil, ErrInvalidFileName
-	}
-
-	// Module: Force TypeModule() since load only works with modules
-	flags = append(flags, TypeModule())
-	option := createEvalOption(c, file, flags...)
-
-	evalOptions := option.Handle()
-
-	defer option.Free()
-
-	result := c.Call("QJS_Load", c.Raw(), evalOptions)
-
-	return normalizeJsValue(c, result)
-}
-
 func eval(c *Context, file string, flags ...EvalOptionFunc) (*Value, error) {
 	if file == "" {
 		return nil, ErrInvalidFileName
@@ -53,6 +35,24 @@ func compile(c *Context, file string, flags ...EvalOptionFunc) (_ []byte, err er
 	copy(bytes, bytecodeBytes)
 
 	return bytes, nil
+}
+
+func load(c *Context, file string, flags ...EvalOptionFunc) (*Value, error) {
+	if file == "" {
+		return nil, ErrInvalidFileName
+	}
+
+	// Module: Force TypeModule() since load only works with modules
+	flags = append(flags, TypeModule())
+	option := createEvalOption(c, file, flags...)
+
+	evalOptions := option.Handle()
+
+	defer option.Free()
+
+	result := c.Call("QJS_Load", c.Raw(), evalOptions)
+
+	return normalizeJsValue(c, result)
 }
 
 func normalizeJsValue(c *Context, value *Value) (*Value, error) {

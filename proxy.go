@@ -17,6 +17,26 @@ type ProxyRegistry struct {
 	proxies map[uint64]any
 }
 
+// JsFunctionProxy is the Go host function that will be imported by the WASM module. It corresponds
+// to the following C declaration:
+//
+//	__attribute__((import_module("env"), import_name("jsFunctionProxy")))
+//	extern JSValue jsFunctionProxy(JSContext *ctx, JSValueConst this, int argc, JSValueConst *argv);
+//
+// Parameters:
+//   - ctx: JSContext pointer
+//   - this: JSValueConst this (the "this" value)
+//   - argc: int argc (number of arguments)
+//   - argv: pointer to argv (an array of JSValueConst/JSValue, each 8 bytes - uint64)
+type JsFunctionProxy = func(
+	ctx context.Context,
+	module api.Module,
+	jsCtx uint32,
+	thisVal uint64,
+	argc uint32,
+	argv uint32,
+) (rs uint64)
+
 // NewProxyRegistry creates a new thread-safe proxy registry.
 func NewProxyRegistry() *ProxyRegistry {
 	return &ProxyRegistry{
@@ -87,26 +107,6 @@ func (r *ProxyRegistry) Clear() {
 	r.proxies = make(map[uint64]any)
 	r.mu.Unlock()
 }
-
-// JsFunctionProxy is the Go host function that will be imported by the WASM module. It corresponds
-// to the following C declaration:
-//
-//	__attribute__((import_module("env"), import_name("jsFunctionProxy")))
-//	extern JSValue jsFunctionProxy(JSContext *ctx, JSValueConst this, int argc, JSValueConst *argv);
-//
-// Parameters:
-//   - ctx: JSContext pointer
-//   - this: JSValueConst this (the "this" value)
-//   - argc: int argc (number of arguments)
-//   - argv: pointer to argv (an array of JSValueConst/JSValue, each 8 bytes - uint64)
-type JsFunctionProxy = func(
-	ctx context.Context,
-	module api.Module,
-	jsCtx uint32,
-	thisVal uint64,
-	argc uint32,
-	argv uint32,
-) (rs uint64)
 
 // createFuncProxyWithRegistry creates a WASM function proxy that bridges JavaScript function
 // calls to Go functions. It handles parameter extraction, error recovery, and result conversion

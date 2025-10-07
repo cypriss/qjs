@@ -20,38 +20,6 @@ func (m *Mem) Size() uint32 {
 	return m.mem.Size()
 }
 
-// UnpackPtr extracts address and size from a packed 64-bit value in memory. It reads 8 bytes
-// from the memory address specified by packedPtr, reconstructs the original uint64 value,
-// and then extracts the 32-bit address from the high bits and the 32-bit size from the low
-// bits.
-//
-// Maintains original signature for backward compatibility - panics on error.
-func (m *Mem) UnpackPtr(packedPtr uint64) (uint32, uint32) {
-	if packedPtr == 0 {
-		return 0, 0
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	packedBytes, err := m.Read(uint32(packedPtr), PackedPtrSize)
-	if err != nil {
-		panic(err)
-	}
-
-	// Reconstruct the packed value from little-endian bytes
-	packed := uint64(0)
-	for i := range PackedPtrSize {
-		packed |= uint64(packedBytes[i]) << (i * 8)
-	}
-
-	// Extract address (high 32 bits) and size (low 32 bits)
-	addr := uint32(packed >> 32)
-	size := uint32(packed)
-
-	return addr, size
-}
-
 // Read extracts bytes from WebAssembly memory at the specified address. Performs comprehensive
 // validation and bounds checking.
 func (m *Mem) Read(addr uint32, size uint64) ([]byte, error) {
@@ -255,6 +223,38 @@ func (m *Mem) WriteString(ptr uint32, s string) error {
 	buf[len(s)] = StringTerminator
 
 	return nil
+}
+
+// UnpackPtr extracts address and size from a packed 64-bit value in memory. It reads 8 bytes
+// from the memory address specified by packedPtr, reconstructs the original uint64 value,
+// and then extracts the 32-bit address from the high bits and the 32-bit size from the low
+// bits.
+//
+// Maintains original signature for backward compatibility - panics on error.
+func (m *Mem) UnpackPtr(packedPtr uint64) (uint32, uint32) {
+	if packedPtr == 0 {
+		return 0, 0
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	packedBytes, err := m.Read(uint32(packedPtr), PackedPtrSize)
+	if err != nil {
+		panic(err)
+	}
+
+	// Reconstruct the packed value from little-endian bytes
+	packed := uint64(0)
+	for i := range PackedPtrSize {
+		packed |= uint64(packedBytes[i]) << (i * 8)
+	}
+
+	// Extract address (high 32 bits) and size (low 32 bits)
+	addr := uint32(packed >> 32)
+	size := uint32(packed)
+
+	return addr, size
 }
 
 // StringFromPackedPtr reads a string from a packed pointer containing address and size. Maintains
