@@ -10,9 +10,12 @@ import (
 // It manages raw pointer values from WebAssembly memory and provides safe
 // type conversion methods with proper resource management.
 type Handle struct {
-	raw     uint64
+	// raw stores the underlying QuickJS pointer value.
+	raw uint64
+	// runtime references the owning runtime for memory operations.
 	runtime *Runtime
-	freed   int32 // atomic flag to prevent double-free
+	// freed guards against double free operations using an atomic flag.
+	freed int32 // atomic flag to prevent double-free
 }
 
 // NewHandle creates a new Handle wrapping the given pointer value.
@@ -66,19 +69,22 @@ func (h *Handle) Bool() bool {
 	return int32(h.raw) != 0
 }
 
-// Signed integer conversion methods with bounds checking.
+// Signed enumerates signed integer types supported by Handle conversions.
 type Signed interface {
 	~int | ~int8 | ~int16 | ~int32 | ~int64
 }
 
+// Unsigned enumerates unsigned integer types supported by Handle conversions.
 type Unsigned interface {
 	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr
 }
 
+// Integer groups both signed and unsigned integer type sets.
 type Integer interface {
 	Signed | Unsigned
 }
 
+// Float enumerates floating-point types supported by conversions.
 type Float interface {
 	~float32 | ~float64
 }
@@ -142,16 +148,37 @@ func ConvertToUnsigned[T Unsigned](h *Handle) T {
 	return result
 }
 
-func (h *Handle) Int() int         { return ConvertToSigned[int](h) }
-func (h *Handle) Int8() int8       { return ConvertToSigned[int8](h) }
-func (h *Handle) Int16() int16     { return ConvertToSigned[int16](h) }
-func (h *Handle) Int32() int32     { return ConvertToSigned[int32](h) }
-func (h *Handle) Int64() int64     { return ConvertToSigned[int64](h) }
-func (h *Handle) Uint() uint       { return ConvertToUnsigned[uint](h) }
-func (h *Handle) Uint8() uint8     { return ConvertToUnsigned[uint8](h) }
-func (h *Handle) Uint16() uint16   { return ConvertToUnsigned[uint16](h) }
-func (h *Handle) Uint32() uint32   { return ConvertToUnsigned[uint32](h) }
-func (h *Handle) Uint64() uint64   { return ConvertToUnsigned[uint64](h) }
+// Int returns the handle value as a Go int.
+func (h *Handle) Int() int { return ConvertToSigned[int](h) }
+
+// Int8 returns the handle value as an int8.
+func (h *Handle) Int8() int8 { return ConvertToSigned[int8](h) }
+
+// Int16 returns the handle value as an int16.
+func (h *Handle) Int16() int16 { return ConvertToSigned[int16](h) }
+
+// Int32 returns the handle value as an int32.
+func (h *Handle) Int32() int32 { return ConvertToSigned[int32](h) }
+
+// Int64 returns the handle value as an int64.
+func (h *Handle) Int64() int64 { return ConvertToSigned[int64](h) }
+
+// Uint returns the handle value as a uint.
+func (h *Handle) Uint() uint { return ConvertToUnsigned[uint](h) }
+
+// Uint8 returns the handle value as a uint8.
+func (h *Handle) Uint8() uint8 { return ConvertToUnsigned[uint8](h) }
+
+// Uint16 returns the handle value as a uint16.
+func (h *Handle) Uint16() uint16 { return ConvertToUnsigned[uint16](h) }
+
+// Uint32 returns the handle value as a uint32.
+func (h *Handle) Uint32() uint32 { return ConvertToUnsigned[uint32](h) }
+
+// Uint64 returns the handle value as a uint64.
+func (h *Handle) Uint64() uint64 { return ConvertToUnsigned[uint64](h) }
+
+// Uintptr returns the handle value as a uintptr.
 func (h *Handle) Uintptr() uintptr { return ConvertToUnsigned[uintptr](h) }
 
 // Float32 converts the handle value to float32 by interpreting the lower 32 bits
@@ -197,8 +224,8 @@ func (h *Handle) String() string {
 }
 
 // Bytes converts the handle value to []byte by reading from QuickJS memory.
-// Returns empty slice for zero handles or if the handle is freed.
-// The returned bytes are a copy and safe to modify.
+// Bytes returns the handle contents as a byte slice copy.
+// Returns nil for zero handles or when the handle has been freed.
 func (h *Handle) Bytes() []byte {
 	if h == nil || h.IsFreed() || h.raw == 0 {
 		return nil

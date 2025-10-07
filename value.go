@@ -9,28 +9,42 @@ import (
 )
 
 type (
-	Function      func(ctx *This) (*Value, error)
+	// Function defines a Go function that can be exported to JavaScript.
+	Function func(ctx *This) (*Value, error)
+	// AsyncFunction defines an asynchronous Go function exposed to JavaScript.
 	AsyncFunction func(ctx *This)
-	JSAtom        uint32
+	// JSAtom represents a QuickJS atom identifier.
+	JSAtom uint32
 )
 
+// Value wraps a QuickJS JSValue handle and its owning context.
 type Value struct {
-	handle  *Handle
+	// handle references the underlying JSValue handle.
+	handle *Handle
+	// context points to the QuickJS context that created the value.
 	context *Context
 }
 
+// This describes the JavaScript "this" binding provided to Go callbacks.
 type This struct {
 	*Value
 
+	// context is the QuickJS execution context for the function call.
 	context *Context
-	args    []*Value
+	// args contains the arguments passed from JavaScript.
+	args []*Value
+	// promise references the promise used for async functions.
 	promise *Value
+	// isAsync reports whether the invocation originated from an async function.
 	isAsync bool
 }
 
+// JSPropertyEnum captures property enumeration metadata emitted by QuickJS.
 type JSPropertyEnum struct {
+	// isEnumerable reports whether the property is enumerable.
 	isEnumerable bool
-	atom         JSAtom
+	// atom is the identifier for the property name.
+	atom JSAtom
 }
 
 const jsPropertyEnumSize = uint32(unsafe.Sizeof(JSPropertyEnum{}))
@@ -43,35 +57,45 @@ type Atom struct {
 	context *Context
 }
 
+// OwnProperty describes an object's property entry during enumeration.
 type OwnProperty struct {
+	// isEnumerable reports whether the property is enumerable.
 	isEnumerable bool
-	atom         Atom
+	// atom contains the property's atom identifier.
+	atom Atom
 }
 
+// String returns the property's name as a string.
 func (p OwnProperty) String() string {
 	return p.atom.String()
 }
 
+// Context returns the QuickJS context for the function invocation.
 func (t *This) Context() *Context {
 	return t.context
 }
 
+// Args provides the arguments passed from JavaScript.
 func (t *This) Args() []*Value {
 	return t.args
 }
 
+// Promise returns the promise used to resolve async invocations.
 func (t *This) Promise() *Value {
 	return t.promise
 }
 
+// IsAsync reports whether the invocation is asynchronous.
 func (t *This) IsAsync() bool {
 	return t.isAsync
 }
 
+// Free releases the underlying QuickJS atom handle.
 func (a Atom) Free() {
 	a.context.Call("JS_FreeAtom", a.context.Raw(), a.Raw())
 }
 
+// String converts the atom into its string representation.
 func (a Atom) String() string {
 	result := a.context.Call("QJS_AtomToCString", a.context.Raw(), a.Raw())
 	defer result.handle.Free()
@@ -79,14 +103,17 @@ func (a Atom) String() string {
 	return result.handle.String()
 }
 
+// ToValue converts the atom into a JavaScript value.
 func (a Atom) ToValue() *Value {
 	return a.context.Call("JS_AtomToValue", a.context.Raw(), a.Raw())
 }
 
+// Handle returns the underlying Handle backing this value.
 func (v *Value) Handle() *Handle {
 	return v.handle
 }
 
+// Raw returns the raw QuickJS value identifier.
 func (v *Value) Raw() uint64 {
 	if v == nil || v.handle == nil {
 		return 0
@@ -95,6 +122,7 @@ func (v *Value) Raw() uint64 {
 	return v.handle.raw
 }
 
+// Free releases the QuickJS value, preventing further use.
 func (v *Value) Free() {
 	if v != nil && v.Raw() != 0 {
 		v.context.FreeJsValue(v.handle.raw)
@@ -102,22 +130,27 @@ func (v *Value) Free() {
 	}
 }
 
+// Context returns the QuickJS context associated with the value.
 func (v *Value) Context() *Context {
 	return v.context
 }
 
+// Ctx returns the raw context handle for the value.
 func (v *Value) Ctx() uint64 {
 	return v.context.Raw()
 }
 
+// Call invokes a QuickJS runtime function and returns the resulting value.
 func (v *Value) Call(name string, args ...uint64) *Value {
 	return v.context.Call(name, args...)
 }
 
+// Clone duplicates the value within the same context.
 func (v *Value) Clone() *Value {
 	return v.Call("QJS_CloneValue", v.Ctx(), v.Raw())
 }
 
+// Type returns a descriptive type string for the JavaScript value.
 func (v *Value) Type() string {
 	// Check Symbol first, as it is a special case
 	if v.IsSymbol() {
@@ -213,6 +246,7 @@ func (v *Value) Type() string {
 	return "unknown"
 }
 
+// NewUndefined creates a new undefined value using the current context.
 func (v *Value) NewUndefined() *Value {
 	return v.context.NewUndefined()
 }
@@ -230,6 +264,7 @@ func (v *Value) GetOwnPropertyNames() (_ []string, err error) {
 	return names, nil
 }
 
+// GetOwnProperties retrieves metadata for enumerable properties on the value.
 func (v *Value) GetOwnProperties() []OwnProperty {
 	ptr, entriesCount := v.context.CallUnPack(
 		"QJS_GetOwnPropertyNames",
@@ -270,12 +305,14 @@ func (v *Value) GetOwnProperties() []OwnProperty {
 	return property
 }
 
+// GetProperty retrieves a property's value using a JavaScript value as the key.
 func (v *Value) GetProperty(name *Value) *Value {
 	atom := v.Call("JS_ValueToAtom", v.Ctx(), name.Raw())
 
 	return v.Call("JS_GetProperty", v.Ctx(), v.Raw(), atom.Raw())
 }
 
+// SetProperty assigns a property identified by a JavaScript value.
 func (v *Value) SetProperty(name, val *Value) {
 	atom := v.Call("JS_ValueToAtom", v.Ctx(), name.Raw())
 	v.Call("JS_SetProperty", v.Ctx(), v.Raw(), atom.Raw(), val.Raw())
@@ -389,6 +426,7 @@ func (v *Value) ToByteArray() []byte {
 	return result.handle.Bytes()
 }
 
+// Exception converts a JavaScript Error value into a Go error.
 func (v *Value) Exception() error {
 	cause := v.String()
 
@@ -404,34 +442,42 @@ func (v *Value) Exception() error {
 	return errors.New(cause + "\n" + stackStr)
 }
 
+// IsNumber reports whether the value is a JavaScript number.
 func (v *Value) IsNumber() bool {
 	return v.Call("QJS_IsNumber", v.Raw()).handle.Bool()
 }
 
+// IsNaN reports whether the value represents NaN.
 func (v *Value) IsNaN() bool {
 	return v.String() == "NaN"
 }
 
+// IsInfinity reports whether the value represents positive or negative infinity.
 func (v *Value) IsInfinity() bool {
 	return v.String() == "Infinity"
 }
 
+// IsBigInt reports whether the value is a BigInt.
 func (v *Value) IsBigInt() bool {
 	return v.Call("QJS_IsBigInt", v.Raw()).handle.Bool()
 }
 
+// IsDate reports whether the value is a Date object.
 func (v *Value) IsDate() bool {
 	return v.Call("JS_IsDate", v.Raw()).handle.Bool()
 }
 
+// IsBool reports whether the value is a boolean.
 func (v *Value) IsBool() bool {
 	return v.Call("QJS_IsBool", v.Raw()).handle.Bool()
 }
 
+// IsNull reports whether the value is null.
 func (v *Value) IsNull() bool {
 	return v.Call("QJS_IsNull", v.Raw()).handle.Bool()
 }
 
+// IsUndefined reports whether the value is undefined.
 func (v *Value) IsUndefined() bool {
 	return v.Call("QJS_IsUndefined", v.Raw()).handle.Bool()
 }
@@ -440,42 +486,52 @@ func (v *Value) IsUndefined() bool {
 // 	return v.Call("QJS_IsException", v.Raw()).handle.Bool()
 // }
 
+// IsUninitialized reports whether the value is in the QuickJS uninitialized state.
 func (v *Value) IsUninitialized() bool {
 	return v.Call("QJS_IsUninitialized", v.Raw()).handle.Bool()
 }
 
+// IsString reports whether the value is a string.
 func (v *Value) IsString() bool {
 	return v.Call("QJS_IsString", v.Raw()).handle.Bool()
 }
 
+// IsSymbol reports whether the value is a Symbol.
 func (v *Value) IsSymbol() bool {
 	return v.Call("QJS_IsSymbol", v.Raw()).handle.Bool()
 }
 
+// IsQJSProxyValue reports whether the value is a QuickJS proxy wrapper.
 func (v *Value) IsQJSProxyValue() bool {
 	return v.IsObject() && v.IsGlobalInstanceOf("QJS_PROXY_VALUE")
 }
 
+// IsObject reports whether the value is considered an object.
 func (v *Value) IsObject() bool {
 	return v.Call("QJS_IsObject", v.Raw()).handle.Bool()
 }
 
+// IsArray reports whether the value is an array.
 func (v *Value) IsArray() bool {
 	return v.Call("QJS_IsArray", v.Raw()).handle.Bool()
 }
 
+// IsError reports whether the value is an error object.
 func (v *Value) IsError() bool {
 	return v.Call("QJS_IsError", v.Ctx(), v.Raw()).handle.Bool()
 }
 
+// IsFunction reports whether the value is a function.
 func (v *Value) IsFunction() bool {
 	return v.Call("QJS_IsFunction", v.Ctx(), v.Raw()).handle.Bool()
 }
 
+// IsConstructor reports whether the value can act as a constructor.
 func (v *Value) IsConstructor() bool {
 	return v.Call("QJS_IsConstructor", v.Ctx(), v.Raw()).handle.Bool()
 }
 
+// IsPromise reports whether the value is a Promise instance.
 func (v *Value) IsPromise() bool {
 	return v.Call("QJS_IsPromise", v.Ctx(), v.Raw()).handle.Bool()
 }
@@ -514,6 +570,7 @@ func (v *Value) Reject(args ...*Value) error {
 	return nil
 }
 
+// Await blocks until the promise settles, returning its resolution or rejection.
 func (v *Value) Await() (*Value, error) {
 	if !v.IsPromise() {
 		return nil, newInvalidJsInputErr("Promise", v)
@@ -524,11 +581,13 @@ func (v *Value) Await() (*Value, error) {
 	return normalizeJsValue(v.context, result)
 }
 
+// IsMap reports whether the value is a Map-like object.
 func (v *Value) IsMap() bool {
 	return v.IsObject() && v.IsGlobalInstanceOf("Map") ||
 		v.String() == "[object Map]"
 }
 
+// IsSet reports whether the value is a Set-like object.
 func (v *Value) IsSet() bool {
 	return v.IsObject() && v.IsGlobalInstanceOf("Set") ||
 		v.String() == "[object Set]"
@@ -548,7 +607,7 @@ func (v *Value) IsGlobalInstanceOf(name string) bool {
 	return instanceOf.handle.Bool()
 }
 
-// IsByteArray return true if the value is array buffer.
+// IsByteArray returns true if the value represents an ArrayBuffer.
 func (v *Value) IsByteArray() bool {
 	return v.IsObject() && v.IsGlobalInstanceOf("ArrayBuffer") ||
 		v.String() == "[object ArrayBuffer]"
@@ -586,10 +645,12 @@ func (v *Value) ForEach(fn func(key *Value, value *Value)) {
 	}
 }
 
+// Bytes returns the underlying value as a byte slice copy.
 func (v *Value) Bytes() []byte {
 	return v.handle.Bytes()
 }
 
+// String renders the value as a UTF-8 string.
 func (v *Value) String() string {
 	result := v.Call("QJS_ToCString", v.Ctx(), v.Raw())
 	defer result.handle.Free()
@@ -653,6 +714,7 @@ func (v *Value) Int32() int32 {
 	return v.Call("QJS_ToInt32", v.Ctx(), v.Raw()).handle.Int32()
 }
 
+// Int64 returns the int64 value of the value.
 func (v *Value) Int64() int64 {
 	return v.Call("QJS_ToInt64", v.Ctx(), v.Raw()).handle.Int64()
 }

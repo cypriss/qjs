@@ -25,17 +25,27 @@ var (
 
 // Runtime wraps a QuickJS WebAssembly runtime with memory management.
 type Runtime struct {
-	wrt      wazero.Runtime
-	module   api.Module
-	malloc   api.Function
-	free     api.Function
-	mem      *Mem
-	option   *Option
-	handle   *Handle
-	context  *Context
+	// wrt is the underlying wazero runtime instance.
+	wrt wazero.Runtime
+	// module is the instantiated QuickJS WebAssembly module.
+	module api.Module
+	// malloc references the module's allocator function.
+	malloc api.Function
+	// free references the module's free function.
+	free api.Function
+	// mem provides a convenient wrapper around module memory.
+	mem *Mem
+	// option stores the configuration used to create the runtime.
+	option *Option
+	// handle represents the top-level QuickJS runtime handle.
+	handle *Handle
+	// context is the JavaScript execution context bound to this runtime.
+	context *Context
+	// registry tracks exported Go functions accessible from JavaScript.
 	registry *ProxyRegistry
 }
 
+// createGlobalCompiledModule compiles and caches the QuickJS module if needed.
 func createGlobalCompiledModule(
 	ctx context.Context,
 	closeOnContextDone bool,
@@ -297,6 +307,7 @@ func (r *Runtime) initializeRuntime() {
 	r.context.runtime = r
 }
 
+// call invokes the named exported function and returns its first result.
 func (r *Runtime) call(name string, args ...uint64) uint64 {
 	fn := r.module.ExportedFunction(name)
 	if fn == nil {
@@ -318,11 +329,16 @@ func (r *Runtime) call(name string, args ...uint64) uint64 {
 
 // Pool manages a collection of reusable QuickJS runtimes.
 type Pool struct {
-	pools      chan *Runtime
-	size       int
-	option     *Option
+	// pools holds reusable runtime instances.
+	pools chan *Runtime
+	// size records the maximum number of runtimes tracked.
+	size int
+	// option contains the base configuration applied to new runtimes.
+	option *Option
+	// setupFuncs runs initialization hooks for each new runtime.
 	setupFuncs []func(*Runtime) error
-	mu         sync.Mutex
+	// mu protects pool creation paths from races.
+	mu sync.Mutex
 }
 
 // NewPool creates a new runtime pool with the specified size and configuration.

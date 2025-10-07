@@ -12,8 +12,11 @@ import (
 // ProxyRegistry stores Go functions that can be called from JavaScript.
 // It provides thread-safe registration and retrieval of functions with automatic ID generation.
 type ProxyRegistry struct {
-	nextID  uint64
-	mu      sync.RWMutex
+	// nextID holds the next identifier to assign to a registered function.
+	nextID uint64
+	// mu guards access to the registry map.
+	mu sync.RWMutex
+	// proxies maps registration identifiers to Go functions.
 	proxies map[uint64]any
 }
 

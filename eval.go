@@ -1,5 +1,6 @@
 package qjs
 
+// load loads a JavaScript module into the provided context without executing it.
 func load(c *Context, file string, flags ...EvalOptionFunc) (*Value, error) {
 	if file == "" {
 		return nil, ErrInvalidFileName
@@ -18,6 +19,7 @@ func load(c *Context, file string, flags ...EvalOptionFunc) (*Value, error) {
 	return normalizeJsValue(c, result)
 }
 
+// eval evaluates the provided file or source string within the context.
 func eval(c *Context, file string, flags ...EvalOptionFunc) (*Value, error) {
 	if file == "" {
 		return nil, ErrInvalidFileName
@@ -33,6 +35,7 @@ func eval(c *Context, file string, flags ...EvalOptionFunc) (*Value, error) {
 	return normalizeJsValue(c, result)
 }
 
+// compile compiles the provided JavaScript source into bytecode.
 func compile(c *Context, file string, flags ...EvalOptionFunc) (_ []byte, err error) {
 	option := createEvalOption(c, file, flags...)
 
@@ -55,6 +58,7 @@ func compile(c *Context, file string, flags ...EvalOptionFunc) (_ []byte, err er
 	return bytes, nil
 }
 
+// normalizeJsValue unwraps runtime exceptions from a JavaScript call.
 func normalizeJsValue(c *Context, value *Value) (*Value, error) {
 	hasException := c.HasException()
 	if hasException {
