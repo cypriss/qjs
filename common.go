@@ -35,6 +35,7 @@ const (
 	StringTerminator = byte(0)
 )
 
+// NumberType is a type constraint that matches all Go numeric types supported by GoNumberToJS.
 type NumberType interface {
 	int |
 		int8 |
@@ -84,17 +85,33 @@ var (
 
 // ObjectOrMap interface for unified object/map handling.
 type ObjectOrMap interface {
+	// IsObject reports whether the receiver wraps a plain JavaScript object (not a Map).
 	IsObject() bool
+
+	// IsMap reports whether the receiver wraps a JavaScript Map.
 	IsMap() bool
+
+	// ToMap returns a Map wrapper for the receiver. Call only when IsMap reports true.
 	ToMap() *Map
+
+	// JSONStringify returns the JSON encoding of the value or an error if stringification fails.
 	JSONStringify() (string, error)
+
+	// IsNull reports whether the underlying JavaScript value is null.
 	IsNull() bool
+
+	// ForEach calls callback for each key/value pair. For objects, keys are property names; for
+	// Maps, keys are entry keys. The Value arguments are valid only during the callback and must
+	// not be freed by the caller. Iteration order is unspecified.
 	ForEach(callback func(*Value, *Value))
 }
 
 // FieldMapper handles struct field mapping with caching for performance.
 type FieldMapper struct {
-	mu    sync.RWMutex
+	// mu protects concurrent access to the field map cache.
+	mu sync.RWMutex
+
+	// cache stores, per struct type, the mapping from JSON field names to FieldPath.
 	cache map[reflect.Type]map[string]FieldPath
 }
 
@@ -216,6 +233,7 @@ func getFieldMap(structType reflect.Type) map[string]FieldPath {
 
 // Tracker tracks objects during Go-JS conversion to detect circular references.
 type Tracker[T uintptr | uint64] struct {
+	// processing holds the set of object identities currently being converted.
 	processing map[T]bool
 }
 
@@ -245,8 +263,13 @@ func (tracker *Tracker[T]) UnTrack(ptr T) {
 
 // CircularTracker manages the lifecycle of circular reference tracking for a single object.
 type CircularTracker[T uintptr | uint64] struct {
-	ctx             *Tracker[T]
-	ptr             T
+	// ctx is the owning Tracker used for registration and unregistration.
+	ctx *Tracker[T]
+
+	// ptr is the tracked object identity.
+	ptr T
+
+	// needsUnregister reports whether cleanup should call UnTrack.
 	needsUnregister bool
 }
 
@@ -288,10 +311,15 @@ func (ct *CircularTracker[T]) cleanup() {
 
 // JsNumericToGoConverter handles conversion from float64 to various numeric types.
 type JsNumericToGoConverter struct {
+	// targetType is the concrete (non-pointer) numeric type to convert into.
 	targetType reflect.Type
-	isPointer  bool
+
+	// isPointer indicates Convert should return a pointer to the target type.
+	isPointer bool
 }
 
+// NewJsNumericToGoConverter returns a converter configured to produce values of targetType.
+// If targetType is a pointer, the converter will return a pointer to the converted value.
 func NewJsNumericToGoConverter(targetType reflect.Type) *JsNumericToGoConverter {
 	isPointer := targetType.Kind() == reflect.Ptr
 	if isPointer {
@@ -304,6 +332,10 @@ func NewJsNumericToGoConverter(targetType reflect.Type) *JsNumericToGoConverter 
 	}
 }
 
+// Convert converts floatVal to the converter's target numeric type. It first validates the
+// value with NumericBoundsCheck, then performs the conversion via FloatToInt. If the converter
+// is configured to return a pointer, Convert allocates and returns a pointer to the target
+// value. It returns an error on overflow or if the target kind is unsupported.
 func (nc *JsNumericToGoConverter) Convert(floatVal float64) (any, error) {
 	targetKind := nc.targetType.Kind()
 	if err := NumericBoundsCheck(floatVal, targetKind); err != nil {
@@ -326,12 +358,29 @@ func (nc *JsNumericToGoConverter) Convert(floatVal float64) (any, error) {
 
 // JsArrayToGoConverter handles array conversions with better error handling and performance.
 type JsArrayToGoConverter[T any] struct {
-	tracker    *Tracker[uint64]
-	input      *Value
+	// tracker detects circular references during conversion.
+	tracker *Tracker[uint64]
+
+	// input is the source JavaScript value to convert (ex: a JS array).
+	input *Value
+
+	// targetType is the Go type to materialize, derived from sample.
 	targetType reflect.Type
-	sample     T
+
+	// sample is an exemplar of T used to infer targetType; zero if none was provided.
+	sample T
 }
 
+// NewJsArrayToGoConverter constructs a converter that materializes a JavaScript Array in input
+// as a Go value of type T. Use the returned converter's Convert method to perform the conversion.
+//
+// If samples is provided, the first value is used as an exemplar to infer or refine the concrete
+// target type (ex: pass []int{} to produce []int). When no sample is supplied, specify T explicitly
+// (ex: NewJsArrayToGoConverter[[]int](input)). An exemplar is often required when T is an
+// interface to indicate the desired concrete type.
+//
+// input should refer to a JavaScript Array; converting a non-array value will cause Convert
+// to report an error. The converter detects circular references during conversion.
 func NewJsArrayToGoConverter[T any](input *Value, samples ...T) *JsArrayToGoConverter[T] {
 	var sample T
 	if len(samples) > 0 {
@@ -346,6 +395,15 @@ func NewJsArrayToGoConverter[T any](input *Value, samples ...T) *JsArrayToGoConv
 	}
 }
 
+// Convert materializes ac.input into a Go value of type T. It first coerces the input to a
+// JavaScript Array and then chooses a conversion strategy based on ac.targetType:
+//   - interface or unspecified: builds a []any;
+//   - slice: builds a slice with element-wise conversion;
+//   - array: fills a fixed-size array (failing if the JS length exceeds the Go length);
+//   - otherwise: falls back to JSON stringify/unmarshal into ac.targetType.
+//
+// On error, Convert returns the zero value of T and a wrapped error that includes the failing
+// element or input where available.
 func (ac *JsArrayToGoConverter[T]) Convert() (T, error) {
 	var zero T
 
@@ -369,6 +427,9 @@ func (ac *JsArrayToGoConverter[T]) Convert() (T, error) {
 	}
 }
 
+// convertToInterface converts jsArray into a []any and returns it as T. Each element is converted
+// using jsValueToGo[any]. Non-function JS element values are freed after conversion. Errors
+// include the element index to aid debugging.
 func (ac *JsArrayToGoConverter[T]) convertToInterface(jsArray *Array, jsLen int64) (T, error) {
 	result := make([]any, 0, jsLen)
 
@@ -397,6 +458,10 @@ func (ac *JsArrayToGoConverter[T]) convertToInterface(jsArray *Array, jsLen int6
 	return resultT, nil
 }
 
+// convertToSlice converts jsArray into a Go slice of ac.targetType. It appends element-wise
+// conversions to a newly allocated slice with capacity jsLen. Conversion respects the slice
+// element type; nil results store the element type's zero value. Non-function JS element values
+// are freed after conversion. Errors include the element index.
 func (ac *JsArrayToGoConverter[T]) convertToSlice(jsArray *Array, jsLen int64) (T, error) {
 	elemType := ac.targetType.Elem()
 	sliceValue := reflect.MakeSlice(ac.targetType, 0, int(jsLen))
@@ -427,6 +492,10 @@ func (ac *JsArrayToGoConverter[T]) convertToSlice(jsArray *Array, jsLen int64) (
 	return sliceT, nil
 }
 
+// convertToArray converts jsArray into a fixed-size Go array of ac.targetType. It returns
+// an error when jsLen exceeds the Go array length. If jsLen is smaller, the remaining elements
+// keep their zero values. Each element is converted to the array element type; nil results
+// produce the element type's zero value. Non-function JS element values are freed after conversion.
 func (ac *JsArrayToGoConverter[T]) convertToArray(jsArray *Array, jsLen int64) (T, error) {
 	elemType := ac.targetType.Elem()
 	goArrayLen := ac.targetType.Len()
@@ -462,6 +531,8 @@ func (ac *JsArrayToGoConverter[T]) convertToArray(jsArray *Array, jsLen int64) (
 	return arrayT, nil
 }
 
+// convertElementValue returns the reflect.Value to store for one array element. If goElem
+// is nil, it returns the zero value of elemType; otherwise it returns reflect.ValueOf(goElem).
 func (ac *JsArrayToGoConverter[T]) convertElementValue(goElem any, elemType reflect.Type) reflect.Value {
 	if goElem == nil {
 		return reflect.Zero(elemType)
@@ -470,6 +541,10 @@ func (ac *JsArrayToGoConverter[T]) convertElementValue(goElem any, elemType refl
 	return reflect.ValueOf(goElem)
 }
 
+// convertViaJSON converts a JavaScript array to T by JSON-stringifying the array and unmarshaling
+// into ac.targetType. It is used as a fallback when the target is neither a slice nor an array.
+// On stringify failure, it returns a wrapped error via newJsStringifyErr("array", err). On
+// unmarshal failure, the returned error includes the raw JSON payload.
 func (ac *JsArrayToGoConverter[T]) convertViaJSON(jsArray *Array) (T, error) {
 	jsonString, err := jsArray.JSONStringify()
 	if err != nil {
@@ -486,6 +561,10 @@ func (ac *JsArrayToGoConverter[T]) convertViaJSON(jsArray *Array) (T, error) {
 	return arrayT, nil
 }
 
+// FloatToInt converts floatVal to a value of the numeric kind targetKind. Integer conversions
+// truncate toward zero; complex conversions set the imaginary part to 0. No range checking
+// is performed; call NumericBoundsCheck first if you need overflow protection. Returns an
+// error if targetKind is unsupported.
 func FloatToInt(floatVal float64, targetKind reflect.Kind) (any, error) {
 	var result any
 
@@ -527,6 +606,8 @@ func FloatToInt(floatVal float64, targetKind reflect.Kind) (any, error) {
 	return result, nil
 }
 
+// IsValid32BitFloat checks whether floatVal fits into a 32-bit int or uint, depending on targetKind.
+// It returns an overflow error if floatVal is outside the valid range.
 func IsValid32BitFloat(floatVal float64, targetKind reflect.Kind) error {
 	var bounds [2]float64
 	if targetKind == reflect.Int {
@@ -542,6 +623,11 @@ func IsValid32BitFloat(floatVal float64, targetKind reflect.Kind) error {
 	return nil
 }
 
+// NumericBoundsCheck reports an overflow if floatVal cannot be represented by targetKind.
+// It checks platform-independent bounds for the fixed-width integer and float kinds, and treats
+// reflect.Int and reflect.Uint as 32-bit on 32-bit platforms (validated via IsValid32BitFloat).
+// It returns nil if the value is in range. For kinds not covered, no check is performed and
+// nil is returned.
 func NumericBoundsCheck(floatVal float64, targetKind reflect.Kind) error {
 	if bounds, ok := numericBounds[targetKind]; ok {
 		if floatVal < bounds[0] || floatVal > bounds[1] {
@@ -607,6 +693,18 @@ func processTempValue[T any](prefix string, temp any, err error, samples ...T) (
 	return valueT, nil
 }
 
+// StringToNumeric converts s to the numeric type described by targetType. Whitespace is trimmed.
+// If targetType is a pointer, the function converts to its element type and returns a newly
+// allocated pointer to the value.
+//
+// Integer kinds are parsed using a float first (JavaScript-style) and then truncated toward
+// zero. Narrow integer and unsigned kinds are range-checked (unsigned values must be non-negative).
+// Float32/Float64 use strconv.ParseFloat with 32/64-bit precision. Uintptr requires a non-negative
+// value.
+//
+// An empty string returns ErrEmptyStringToNumber. If s cannot be converted to targetType,
+// a conversion error is returned. Note that for Int/Int64 and Uint/Uint64, no explicit upper-bound
+// checks are performed.
 func StringToNumeric(s string, targetType reflect.Type) (result any, err error) {
 	s = strings.TrimSpace(s)
 
@@ -706,6 +804,17 @@ func StringToNumeric(s string, targetType reflect.Type) (result any, err error) 
 	return nil, fmt.Errorf("cannot convert JS string %q to %s", s, targetType.String())
 }
 
+// createGoObjectTarget prepares conversion state for turning a JavaScript object or Map into
+// a Go value of type T. It selects a sample (if provided), normalizes Map inputs to a Map
+// wrapper, chooses the target type (defaulting to map[string]any when the sample is nil),
+// and allocates a pointer to a zero value of that type.
+//
+// Returns:
+//   - temp: a pointer to the allocated zero value of the target type.
+//   - obj: the normalized input (Map wrapper if the input is a Map, otherwise the original
+//     object).
+//   - sample: the selected sample value used to infer the target type.
+//   - target: the reflect.Type chosen for the conversion.
 func createGoObjectTarget[T any](input ObjectOrMap, samples ...T) (
 	temp any,
 	obj ObjectOrMap,
@@ -748,6 +857,10 @@ func canConvertToGoNumber(input *Value) error {
 	return nil
 }
 
+// createTemp returns a nil-initialized temporary value (temp) and a sample of type T. If samples
+// contains at least one element, the first is returned as the sample; otherwise, the zero
+// value of T is used. Callers typically assign to temp during conversion and later pass (temp,
+// sample) to processTempValue to finalize typed results.
 func createTemp[T any](samples ...T) (any, T) {
 	var (
 		tempValue any
@@ -761,12 +874,14 @@ func createTemp[T any](samples ...T) (any, T) {
 	return tempValue, sample
 }
 
+// isFloatWholeNumber reports whether floatVal has no fractional component and fits in int64.
 func isFloatWholeNumber(floatVal float64) bool {
 	return floatVal == float64(int64(floatVal)) &&
 		floatVal >= math.MinInt64 &&
 		floatVal <= math.MaxInt64
 }
 
+// isGoStruct reports whether goType is a struct or a pointer to a struct.
 func isGoStruct(goType reflect.Type) bool {
 	return goType.Kind() == reflect.Struct ||
 		(goType.Kind() == reflect.Ptr && goType.Elem().Kind() == reflect.Struct)
@@ -797,6 +912,10 @@ func VerifyGoFunc(fnType reflect.Type, sample any) error {
 	return nil
 }
 
+// CreateGoBindFuncType extracts and validates the function type to bind to JavaScript. If
+// sample is a function value (including a typed nil), fnType is set to its type. In all cases,
+// the type is validated by VerifyGoFunc. The returned error describes any incompatibility
+// for JS conversion.
 func CreateGoBindFuncType[T any](sample T) (fnType reflect.Type, err error) {
 	sampleVal := reflect.ValueOf(sample)
 	if sampleVal.IsValid() && sampleVal.Kind() == reflect.Func {
@@ -810,6 +929,10 @@ func CreateGoBindFuncType[T any](sample T) (fnType reflect.Type, err error) {
 	return fnType, nil
 }
 
+// AnyToError converts any value into an error, returning nil if the input is nil. If the input
+// is an error, it is returned as-is. If it is a string, it is wrapped with a "recovered from
+// panic" message. All other values are formatted with %v. This is intended for use in deferred
+// panic-recovery paths.
 func AnyToError(err any) error {
 	if err == nil {
 		return nil

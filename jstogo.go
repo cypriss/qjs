@@ -134,6 +134,10 @@ func JsSetToGo[T any](input *Value, samples ...T) (v T, err error) {
 	return jsSetToGoWithContext(NewTracker[uint64](), input, samples...)
 }
 
+// jsSetToGoWithContext converts a JavaScript Set to a Go value of type T, using tracker for
+// circular reference detection. It converts the Set to an Array, frees the temporary array
+// wrapper, and delegates element conversion to jsArrayToGoWithContext. Returns an error when
+// input is not a Set or an element fails to convert.
 func jsSetToGoWithContext[T any](
 	tracker *Tracker[uint64],
 	input *Value,
@@ -151,6 +155,9 @@ func jsSetToGoWithContext[T any](
 	return jsArrayToGoWithContext(tracker, arrayVal.Value, samples...)
 }
 
+// jsArrayToGoWithContext converts a JavaScript Array to T using the provided Tracker for circular
+// reference detection. The target type is inferred from sample. It delegates the work to a
+// JsArrayToGoConverter.
 func jsArrayToGoWithContext[T any](
 	tracker *Tracker[uint64],
 	input *Value,
@@ -166,6 +173,10 @@ func jsArrayToGoWithContext[T any](
 	}).Convert()
 }
 
+// mapEntryToGoWithContext converts a single JavaScript Map entry to Go reflect.Values for
+// assignment to a target map. The key and value are converted to goKeyType and goValueType,
+// respectively. A nil-converted value becomes the element type's zero value. Errors are wrapped
+// to indicate whether the failure was on the map key or map value.
 func mapEntryToGoWithContext(
 	ctx *Tracker[uint64],
 	jsKey, jsValue *Value,
@@ -194,10 +205,17 @@ func mapEntryToGoWithContext(
 	return k, v, nil
 }
 
+// JsObjectOrMapToGoMap converts a JavaScript object or Map to a Go map using default tracking.
+// The map type is inferred from samples or defaults chosen by the converter. See jsObjectOrMapToGoMap
+// for details on error cases and conversion semantics.
 func JsObjectOrMapToGoMap[T any](input *Value, samples ...T) (v T, err error) {
 	return jsObjectOrMapToGoMap(NewTracker[uint64](), input, samples...)
 }
 
+// jsObjectOrMapToGoMap converts a JavaScript object or Map into a Go map. The target map type
+// is selected from sample (or defaults chosen by createGoObjectTarget). Keys and values are
+// converted to the map's key and element types. Circular references are detected. On failure,
+// the returned error identifies whether the key or value conversion failed.
 func jsObjectOrMapToGoMap[T any](
 	tracker *Tracker[uint64],
 	input *Value,
@@ -251,6 +269,9 @@ func jsObjectOrMapToGoMap[T any](
 	return v, err
 }
 
+// JsObjectOrMapToGoStruct converts a JavaScript object or Map to a Go struct (or pointer to
+// struct) using default tracking. The target type is inferred from samples. See jsObjectOrMapToGoStruct
+// for field mapping and error behavior.
 func JsObjectOrMapToGoStruct[T any](
 	input *Value,
 	samples ...T,
@@ -258,6 +279,10 @@ func JsObjectOrMapToGoStruct[T any](
 	return jsObjectOrMapToGoStruct(NewTracker[uint64](), input, samples...)
 }
 
+// jsObjectOrMapToGoStruct converts a JavaScript object or Map into a Go struct (or pointer
+// to struct) as indicated by sample. Field names honor JSON tags, null/undefined properties
+// are skipped, and fields implementing json.Unmarshaler use that path. Circular references
+// are detected. Errors include the target field name for diagnostics.
 func jsObjectOrMapToGoStruct[T any](
 	tracker *Tracker[uint64],
 	input *Value,
@@ -436,6 +461,14 @@ func JsObjectToGo[T any](input *Value, samples ...T) (v T, err error) {
 	return jsObjectToGo(NewTracker[uint64](), input, samples...)
 }
 
+// jsObjectToGo converts a JavaScript object to a Go value of type T by routing to the appropriate
+// converter:
+//   - Map target: jsObjectOrMapToGoMap;
+//   - Struct or pointer to struct: jsObjectOrMapToGoStruct;
+//   - If the input is an Array: array conversion;
+//   - Otherwise: JSON stringify/unmarshal into the requested type.
+//
+// Returns an error if input is not an object or if conversion fails.
 func jsObjectToGo[T any](
 	tracker *Tracker[uint64],
 	input *Value,
@@ -484,10 +517,20 @@ func jsObjectToGo[T any](
 	return processTempValue("JsObjectToGo", temp, err, sample)
 }
 
+// JsFuncToGo converts a JavaScript function value to a Go function of type T using default
+// tracking. The resulting function calls the JS function in its original Context, converting
+// arguments and results. When T ends with an error result, JavaScript exceptions and conversion
+// failures are returned via that error. Returns an error if input is not a function or the
+// target type is incompatible.
 func JsFuncToGo[T any](input *Value, samples ...T) (v T, err error) {
 	return jsFuncToGo(NewTracker[uint64](), input, samples...)
 }
 
+// jsFuncToGo binds a JavaScript function to a Go function of type T. The resulting Go function
+// calls the JS function in its original Context, converting arguments and results as needed.
+// When T's signature ends with an error, JavaScript exceptions and conversion failures are
+// returned in that position. Returns an error if input is not a function or the desired type
+// is incompatible.
 func jsFuncToGo[T any](
 	tracker *Tracker[uint64],
 	input *Value,
@@ -674,10 +717,25 @@ func handleJsFunctionResult(
 	return results
 }
 
+// JsValueToGo converts a JavaScript value to a Go value of type T. The optional samples parameter
+// guides the target type; a typed nil is sufficient to select T. Special cases include:
+//   - Value/*Value: returns the handle itself;
+//   - primitives (string, number, bigint, bool, null/undefined), Date, RegExp, ArrayBuffer/TypedArray;
+//   - arrays, sets, maps, and plain objects;
+//   - functions: returns a callable Go function when T is a function type.
+//
+// Ownership of input is unchanged. On failure, the returned error describes the expected target
+// and embeds details about the JavaScript input.
 func JsValueToGo[T any](input *Value, samples ...T) (v T, err error) {
 	return jsValueToGo(NewTracker[uint64](), input, samples...)
 }
 
+// jsValueToGo converts a JavaScript value to a Go value of type T using the provided Tracker.
+// The optional sample guides the target type. Special cases include returning Value/*Value
+// directly, extracting proxied Go values, handling primitives (string/number/bigint/bool/null/undefined),
+// Date, RegExp, ArrayBuffer/TypedArray, arrays, sets, maps, and plain objects. For other objects,
+// it falls back to object conversion or JSON when appropriate. Ownership of input is unchanged.
+// Errors describe mismatches or failed conversions with contextual details.
 func jsValueToGo[T any](
 	tracker *Tracker[uint64],
 	input *Value,
