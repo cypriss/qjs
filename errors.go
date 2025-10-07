@@ -72,7 +72,7 @@ func newGoToJsErr(kind string, err error, details ...string) error {
 	return fmt.Errorf("cannot convert Go%s '%s' to JS: %w", detail, kind, err)
 }
 
-func newJsToGoErr(kind *Value, err error, details ...string) error {
+func newJsToGoErr(input *Value, err error, details ...string) error {
 	detail := ""
 	if len(details) > 0 {
 		detail = " " + details[0]
@@ -82,15 +82,15 @@ func newJsToGoErr(kind *Value, err error, details ...string) error {
 
 	var kindErr error
 
-	if kind != nil {
-		kindStr, kindErr = kind.JSONStringify()
+	if input != nil {
+		kindStr, kindErr = input.JSONStringify()
 		if kindErr != nil {
-			kindStr = fmt.Errorf("(%w), %s", kindErr, kind.String()).Error()
+			kindStr = fmt.Errorf("(%w), %s", kindErr, input.String()).Error()
 		}
 	}
 
 	if kindStr == "undefined" || kindStr == "null" {
-		kindStr = kind.Type()
+		kindStr = input.Type()
 	}
 
 	if kindStr != "" {

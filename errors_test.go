@@ -125,16 +125,16 @@ func TestNewJsToGoErr_JSONStringifyFailure(t *testing.T) {
 	defer rt.Close()
 
 	// Create a Value that will fail JSONStringify (circular reference)
-	result, err := rt.Eval("test.js", Code(`
+	value, err := rt.Eval("test.js", Code(`
 		const obj = {};
 		obj.self = obj; // circular reference
 		obj
 	`))
 	require.NoError(t, err)
-	defer result.Free()
+	defer value.Free()
 
 	// This should trigger the JSONStringify failure path
-	jsErr := newJsToGoErr(result, errors.New("conversion failed"), "test details")
+	jsErr := newJsToGoErr(value, errors.New("conversion failed"), "test details")
 
 	assert.Error(t, jsErr)
 	assert.Contains(t, jsErr.Error(), "conversion failed")
@@ -180,7 +180,7 @@ func TestNewJsToGoErr_EmptyErrorConditions(t *testing.T) {
 }
 
 func createCircularValue(ctx *Context) *Value {
-	result, err := ctx.Eval("test.js", Code(`
+	value, err := ctx.Eval("test.js", Code(`
 		const obj = {};
 		obj.self = obj;
 		obj
@@ -188,7 +188,7 @@ func createCircularValue(ctx *Context) *Value {
 	if err != nil {
 		panic(err)
 	}
-	return result
+	return value
 }
 
 func TestNewJsToGoErr(t *testing.T) {

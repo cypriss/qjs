@@ -188,22 +188,22 @@ func TestContextObjectsAndCollections(t *testing.T) {
 	})
 
 	t.Run("json_parsing", func(t *testing.T) {
-		jsonObj := ctx.ParseJSON(`{"name":"John","age":30,"isActive":true,"tags":["developer","golang"]}`)
-		defer jsonObj.Free()
+		obj := ctx.ParseJSON(`{"name":"John","age":30,"isActive":true,"tags":["developer","golang"]}`)
+		defer obj.Free()
 
-		assert.True(t, jsonObj.IsObject())
-		assert.Equal(t, "John", jsonObj.GetPropertyStr("name").String())
-		assert.Equal(t, int32(30), jsonObj.GetPropertyStr("age").Int32())
-		assert.True(t, jsonObj.GetPropertyStr("isActive").Bool())
+		assert.True(t, obj.IsObject())
+		assert.Equal(t, "John", obj.GetPropertyStr("name").String())
+		assert.Equal(t, int32(30), obj.GetPropertyStr("age").Int32())
+		assert.True(t, obj.GetPropertyStr("isActive").Bool())
 
-		tags := jsonObj.GetPropertyStr("tags")
+		tags := obj.GetPropertyStr("tags")
 		defer tags.Free()
 		assert.True(t, tags.IsArray())
 
-		tagsArray := must(tags.ToArray())
-		assert.Equal(t, int64(2), tagsArray.Len())
+		array := must(tags.ToArray())
+		assert.Equal(t, int64(2), array.Len())
 
-		tag0 := tagsArray.Get(0)
+		tag0 := array.Get(0)
 		defer tag0.Free()
 		assert.Equal(t, "developer", tag0.String())
 	})

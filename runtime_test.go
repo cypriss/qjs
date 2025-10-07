@@ -38,13 +38,13 @@ func testConcurrentRuntimeExecution(t *testing.T, threadID int) {
 		Name:     threadName,
 	}
 
-	jsValue, err := qjs.ToJSValue(rt.Context(), data)
+	val, err := qjs.ToJSValue(rt.Context(), data)
 	assert.NoError(t, err)
-	if jsValue != nil {
-		assert.True(t, jsValue.IsObject())
-		assert.Equal(t, int32(threadID), jsValue.GetPropertyStr("ThreadID").Int32())
-		assert.Equal(t, threadName, jsValue.GetPropertyStr("Name").String())
-		jsValue.Free()
+	if val != nil {
+		assert.True(t, val.IsObject())
+		assert.Equal(t, int32(threadID), val.GetPropertyStr("ThreadID").Int32())
+		assert.Equal(t, threadName, val.GetPropertyStr("Name").String())
+		val.Free()
 	}
 
 	// Test call QJS_Panic
@@ -83,13 +83,13 @@ func testPooledRuntimeExecution(t *testing.T, pool *qjs.Pool, workerID int) {
 		"processed": true,
 	}
 
-	jsValue, err := qjs.ToJSValue(rt.Context(), testData)
+	val, err := qjs.ToJSValue(rt.Context(), testData)
 	require.NoError(t, err)
-	defer jsValue.Free()
+	defer val.Free()
 
-	assert.True(t, jsValue.IsObject())
-	assert.Equal(t, int32(workerID), jsValue.GetPropertyStr("workerID").Int32())
-	assert.True(t, jsValue.GetPropertyStr("processed").Bool())
+	assert.True(t, val.IsObject())
+	assert.Equal(t, int32(workerID), val.GetPropertyStr("workerID").Int32())
+	assert.True(t, val.GetPropertyStr("processed").Bool())
 }
 
 func createTestPool(size int, setupFuncs ...func(*qjs.Runtime) error) *qjs.Pool {

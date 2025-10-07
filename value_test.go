@@ -335,9 +335,9 @@ func TestValueConversions(t *testing.T) {
 	t.Run("ToArray", func(t *testing.T) {
 		val := must(ctx.Eval("test.js", qjs.Code("[1, 2, 3]")))
 		defer val.Free()
-		arr := must(val.ToArray())
-		assert.NotNil(t, arr)
-		assert.Equal(t, int64(3), arr.Len())
+		array := must(val.ToArray())
+		assert.NotNil(t, array)
+		assert.Equal(t, int64(3), array.Len())
 
 		num := ctx.NewInt32(42)
 		defer num.Free()
@@ -426,9 +426,9 @@ func TestValueConversions(t *testing.T) {
 }
 
 func TestValuePropertyOperations(t *testing.T) {
-	runtime := must(qjs.New())
-	defer runtime.Close()
-	ctx := runtime.Context()
+	rt := must(qjs.New())
+	defer rt.Close()
+	ctx := rt.Context()
 
 	t.Run("GetSetPropertyStr", func(t *testing.T) {
 		obj := ctx.NewObject()

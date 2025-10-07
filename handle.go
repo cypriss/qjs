@@ -16,14 +16,14 @@ type Handle struct {
 
 // NewHandle creates a new Handle wrapping the given pointer value. The handle maintains a
 // reference to the runtime for proper memory management.
-func NewHandle(runtime *Runtime, ptr uint64) *Handle {
-	if runtime == nil {
+func NewHandle(rt *Runtime, ptr uint64) *Handle {
+	if rt == nil {
 		panic("handle: runtime cannot be nil")
 	}
 
 	return &Handle{
 		raw:     ptr,
-		runtime: runtime,
+		runtime: rt,
 		freed:   0,
 	}
 }

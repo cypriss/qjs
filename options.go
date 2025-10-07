@@ -72,17 +72,17 @@ type EvalOptionFunc func(*EvalOption)
 
 // createEvalOption initializes default option with global scope and strict mode.
 func createEvalOption(c *Context, file string, flags ...EvalOptionFunc) *EvalOption {
-	evalOption := &EvalOption{
+	option := &EvalOption{
 		c:     c,
 		file:  file,
 		flags: JsEvalTypeGlobal | JsEvalFlagStrict,
 	}
 
 	for _, flag := range flags {
-		flag(evalOption)
+		flag(option)
 	}
 
-	return evalOption
+	return option
 }
 
 // Code sets the JavaScript source code to evaluate.
@@ -188,8 +188,8 @@ func (o *EvalOption) Handle() (handle uint64) {
 		byteCodeHandle = o.byteCodeValue.Raw()
 	}
 
-	// Create QuickJS option struct via WASM call
-	option := o.c.Call(
+	// Create QuickJS result struct via WASM call
+	result := o.c.Call(
 		"QJS_CreateEvalOption",
 		codeHandle,
 		byteCodeHandle,
@@ -198,7 +198,7 @@ func (o *EvalOption) Handle() (handle uint64) {
 		o.flags,
 	)
 
-	return option.Raw()
+	return result.Raw()
 }
 
 // Free releases QuickJS value handles to prevent memory leaks. Must be called after Handle()

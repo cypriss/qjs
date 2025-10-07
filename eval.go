@@ -55,19 +55,19 @@ func compile(c *Context, file string, flags ...EvalOptionFunc) (_ []byte, err er
 	return bytes, nil
 }
 
-func normalizeJsValue(c *Context, value *Value) (*Value, error) {
+func normalizeJsValue(c *Context, input *Value) (*Value, error) {
 	hasException := c.HasException()
 	if hasException {
-		value.Free()
+		input.Free()
 
 		return nil, c.Exception()
 	}
 
-	if value.IsError() {
-		defer value.Free()
+	if input.IsError() {
+		defer input.Free()
 
-		return nil, value.Exception()
+		return nil, input.Exception()
 	}
 
-	return value, nil
+	return input, nil
 }

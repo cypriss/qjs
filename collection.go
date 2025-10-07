@@ -25,8 +25,8 @@ func (a *Array) ForEach(forFn func(key, value *Value)) {
 }
 
 // HasIndex returns true if the given index exists in the array.
-func (a *Array) HasIndex(i int64) bool {
-	return a.HasPropertyIndex(i)
+func (a *Array) HasIndex(index int64) bool {
+	return a.HasPropertyIndex(index)
 }
 
 // Get returns the element at the given index.
@@ -287,12 +287,12 @@ func (s *Set) ToArray() *Array {
 		return nil
 	}
 
-	array := s.context.NewArray()
+	arr := s.context.NewArray()
 	s.ForEach(func(value *Value) {
-		array.Push(value.Clone())
+		arr.Push(value.Clone())
 	})
 
-	return array
+	return arr
 }
 
 // ForEach calls forFn for each value.
@@ -311,10 +311,10 @@ func (s *Set) ForEach(forFn func(value *Value)) {
 	})
 	defer forEachFn.Free()
 
-	value, err := s.InvokeJS("forEach", forEachFn)
+	v, err := s.InvokeJS("forEach", forEachFn)
 	if err != nil {
 		panic(fmt.Errorf("failed to invoke forEach on Set: %w", err))
 	}
 
-	defer value.Free()
+	defer v.Free()
 }
