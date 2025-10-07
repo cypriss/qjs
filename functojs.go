@@ -5,7 +5,8 @@ import (
 	"reflect"
 )
 
-// FuncToJS converts a Go function to a JavaScript function.
+// FuncToJS converts a Go function (or pointer to func) to a JavaScript function proxy.
+// The proxy converts JS arguments to Go, invokes the Go function, and converts results back to JS.
 func FuncToJS(c *Context, v any) (_ *Value, err error) {
 	if v == nil {
 		return c.NewNull(), nil
@@ -105,7 +106,7 @@ func JsFuncArgsToGo(jsArgs []*Value, fnType reflect.Type) ([]reflect.Value, erro
 	return goArgs, nil
 }
 
-// handlePointerArgument processes JS arguments for pointer types.
+// handlePointerArgument processes a JS argument for a pointer parameter type.
 func handlePointerArgument(jsArg *Value, argType reflect.Type) (reflect.Value, error) {
 	if jsArg.IsNull() || jsArg.IsUndefined() {
 		return reflect.Zero(argType), nil
@@ -192,8 +193,8 @@ func JsArgToGo(jsArg *Value, argType reflect.Type) (reflect.Value, error) {
 	return reflect.ValueOf(goVal), nil
 }
 
-// CreateVariadicSlice creates a reflect.Value slice for variadic arguments.
-// Converts remaining JS arguments to the slice element type and returns as a slice value.
+// CreateVariadicSlice creates a reflect.Value slice for variadic arguments, converting
+// remaining JS arguments to the slice element type and returning a slice value.
 func CreateVariadicSlice(jsArgs []*Value, sliceType reflect.Type, fixedArgsCount int) (reflect.Value, error) {
 	varArgType := sliceType.Elem()
 	numVarArgs := len(jsArgs)
@@ -211,9 +212,10 @@ func CreateVariadicSlice(jsArgs []*Value, sliceType reflect.Type, fixedArgsCount
 	return variadicSlice, nil
 }
 
-// GoFuncResultToJs processes Go function call results and converts them to JS values.
-// If last return value is a non-nil error, it's thrown in JS context.
-// The remaining return values are converted to JS value or JS array if there are multiple.
+// GoFuncResultToJs converts Go function call results to JS values. If the last return value
+// is a non-nil error, it is returned as an error. With two returns where the last is error,
+// the first is converted and returned (or undefined if none). With multiple returns, a JS array
+// is produced.
 func GoFuncResultToJs(c *Context, results []reflect.Value) (*Value, error) {
 	if len(results) == 0 {
 		return nil, nil

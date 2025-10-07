@@ -25,14 +25,23 @@ var (
 
 // Runtime wraps a QuickJS WebAssembly runtime with memory management.
 type Runtime struct {
-	wrt      wazero.Runtime
-	module   api.Module
-	malloc   api.Function
-	free     api.Function
-	mem      *Mem
-	option   *Option
-	handle   *Handle
-	context  *Context
+	// wrt is the wazero Runtime hosting the compiled QuickJS module.
+	wrt wazero.Runtime
+	// module is the instantiated QuickJS WASM module.
+	module api.Module
+	// malloc is the exported function used to allocate linear memory.
+	malloc api.Function
+	// free is the exported function used to free linear memory.
+	free api.Function
+	// mem wraps the module memory with safe helpers.
+	mem *Mem
+	// option stores the configuration used to create this runtime.
+	option *Option
+	// handle is the QuickJS runtime handle returned from New_QJS.
+	handle *Handle
+	// context is the single QuickJS JSContext associated with this runtime.
+	context *Context
+	// registry holds Go values/functions accessible from JS via proxies.
 	registry *ProxyRegistry
 }
 
@@ -318,11 +327,16 @@ func (r *Runtime) call(name string, args ...uint64) uint64 {
 
 // Pool manages a collection of reusable QuickJS runtimes.
 type Pool struct {
-	pools      chan *Runtime
-	size       int
-	option     *Option
+	// pools is a buffered channel holding idle runtimes.
+	pools chan *Runtime
+	// size is the maximum number of runtimes managed by the pool.
+	size int
+	// option is the base configuration used when creating new runtimes.
+	option *Option
+	// setupFuncs are applied to each new runtime after creation.
 	setupFuncs []func(*Runtime) error
-	mu         sync.Mutex
+	// mu protects pool creation paths.
+	mu sync.Mutex
 }
 
 // NewPool creates a new runtime pool with the specified size and configuration.

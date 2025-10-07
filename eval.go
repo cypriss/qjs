@@ -1,5 +1,6 @@
 package qjs
 
+// load loads a module without evaluating it. It forces module mode.
 func load(c *Context, file string, flags ...EvalOptionFunc) (*Value, error) {
 	if file == "" {
 		return nil, ErrInvalidFileName
@@ -18,6 +19,7 @@ func load(c *Context, file string, flags ...EvalOptionFunc) (*Value, error) {
 	return normalizeJsValue(c, result)
 }
 
+// eval evaluates a script or module based on flags.
 func eval(c *Context, file string, flags ...EvalOptionFunc) (*Value, error) {
 	if file == "" {
 		return nil, ErrInvalidFileName
@@ -33,6 +35,7 @@ func eval(c *Context, file string, flags ...EvalOptionFunc) (*Value, error) {
 	return normalizeJsValue(c, result)
 }
 
+// compile compiles a script to bytecode without executing it.
 func compile(c *Context, file string, flags ...EvalOptionFunc) (_ []byte, err error) {
 	option := createEvalOption(c, file, flags...)
 
@@ -55,6 +58,7 @@ func compile(c *Context, file string, flags ...EvalOptionFunc) (_ []byte, err er
 	return bytes, nil
 }
 
+// normalizeJsValue converts QuickJS return values to Go, surfacing exceptions as errors.
 func normalizeJsValue(c *Context, value *Value) (*Value, error) {
 	hasException := c.HasException()
 	if hasException {

@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// Min returns the smaller of a and b.
 func Min(a, b int) int {
 	if a < b {
 		return a
@@ -15,6 +16,7 @@ func Min(a, b int) int {
 	return b
 }
 
+// IsImplementError reports whether rtype implements the error interface.
 func IsImplementError(rtype reflect.Type) bool {
 	return rtype.Implements(reflect.TypeOf((*error)(nil)).Elem())
 }
@@ -27,6 +29,8 @@ func IsImplementsJSONUnmarshaler(t reflect.Type) bool {
 }
 
 // GetGoTypeName creates a descriptive string for complex types.
+// GetGoTypeName returns a human-readable Go type name for values and reflect.Type.
+// It expands pointers, arrays, slices, maps, chans and functions with detail.
 func GetGoTypeName(input any) string {
 	var t reflect.Type
 	switch v := input.(type) {
@@ -55,6 +59,7 @@ func GetGoTypeName(input any) string {
 }
 
 // CreateGoFuncSignature creates a readable string for function types.
+// CreateGoFuncSignature formats a function type into a human-readable signature.
 func CreateGoFuncSignature(fnType reflect.Type) string {
 	parts := []string{"func("}
 	params := []string{}
@@ -92,6 +97,8 @@ func CreateGoFuncSignature(fnType reflect.Type) string {
 }
 
 // IsConvertibleToJs checks if a Go type can be converted to a JavaScript type.
+// IsConvertibleToJs checks recursively if a Go type can be losslessly represented in JS.
+// It is used to validate function parameters and return values for bindings.
 func IsConvertibleToJs(rType reflect.Type, visited map[reflect.Type]bool, detail string) (err error) {
 	// Prevent infinite recursion for recursive types
 	if visited[rType] {
@@ -161,6 +168,7 @@ func IsConvertibleToJs(rType reflect.Type, visited map[reflect.Type]bool, detail
 }
 
 // IsNumericType checks if a reflect.Type represents a numeric type.
+// IsNumericType reports whether t is any numeric kind (including complex).
 func IsNumericType(t reflect.Type) bool {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
